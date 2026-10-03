@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THREATVERSE — AI-Enabled 3D Drone & Counter-Drone Threat Simulation Trainer</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- Local Three.js & OrbitControls for offline, ultra-fast 3D performance -->
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    
+    :root {
+      --bg-base: #F7F8FA;
+      --card-bg: #FFFFFF;
+      --text-main: #17202A;
+      --text-muted: #667085;
+      --border-color: #E4E7EC;
+      --border-dark: #D0D5DD;
+      --accent-blue: #1D4ED8;
+      --accent-blue-hover: #1E40AF;
+      --accent-navy: #0F172A;
+      --success: #15803D;
+      --warning: #B45309;
+      --danger: #B91C1C;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .font-mono-code {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F1F3F5;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #D0D5DD;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #98A2B3;
+    }
+
+    .radar-sweep {
+      background: conic-gradient(from 0deg, rgba(29, 78, 216, 0.4) 0deg, rgba(29, 78, 216, 0.0) 65deg, rgba(29, 78, 216, 0) 360deg);
+      border-radius: 50%;
+      animation: sweep 3.5s linear infinite;
+    }
+
+    @keyframes sweep {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .subtle-pulse {
+      animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    /* 3D Target Reticle Overlay */
+    .hud-reticle-box {
+      border: 1.5px dashed rgba(59, 130, 246, 0.9);
+      background: rgba(59, 130, 246, 0.12);
+      position: absolute;
+      pointer-events: none;
+      transition: all 0.04s ease-out;
+      transform: translate(-50%, -50%);
+    }
+
+    .hud-corner {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-color: #2563EB;
+    }
+
+    .crosshair-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col select-none">
+
+  <!-- TOP HEADER / TELEMETRY BAR -->
+  <header class="h-12 bg-white border-b border-[#E4E7EC] flex items-center justify-between px-4 z-30 shrink-0">
+    <!-- Brand & Mode -->
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2">
+        <div class="w-6 h-6 rounded bg-[#0F172A] flex items-center justify-center text-white font-bold text-xs tracking-tighter shadow-sm">
+          TV
+        </div>
+        <span class="font-bold text-sm tracking-wider text-[#0F172A]">THREATVERSE</span>
+      </div>
+      <div class="h-4 w-px bg-[#E4E7EC]"></div>
+      <div class="flex items-center space-x-2">
+        <span class="text-[11px] font-semibold tracking-wider uppercase text-[#475467] bg-[#F2F4F7] px-2 py-0.5 rounded border border-[#E4E7EC]">
+          Tactical 3D Environment
+        </span>
+        <div class="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 subtle-pulse"></span>
+          <span class="text-[11px] font-mono-code font-medium text-emerald-800">C-UAS ONLINE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Operations: Scenario & Terrain Preset Switcher -->
+    <div class="flex items-center space-x-4 text-xs text-[#475467]">
+      <!-- 4 Rich Realistic Terrain Selectors (City, Mountains, Village, Port) -->
+      <div class="flex items-center space-x-1.5">
+        <span class="text-[#98A2B3] text-[11px] uppercase font-semibold">Terrain:</span>
+        <div class="flex bg-[#F2F4F7] p-0.5 rounded border border-[#D0D5DD] text-xs">
+          <button onclick="switchTerrain('city')"     id="trnBtnCity"     class="px-2 py-0.5 rounded text-[11px] font-semibold bg-white shadow-xs text-blue-700">Metropolis City</button>
+          <button onclick="switchTerrain('mountain')" id="trnBtnMountain" class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]">Mountain Outpost</button>
+          <button onclick="switchTerrain('village')"  id="trnBtnVillage"  class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]">Rural Village</button>
+          <button onclick="switchTerrain('port')"     id="trnBtnPort"     class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]">Coastal Port</button>
+        </div>
+      </div>
+
+      <div class="h-4 w-px bg-[#E4E7EC]"></div>
+
+      <div class="flex items-center space-x-1.5">
+        <span class="text-[#98A2B3] text-[11px] uppercase">Clock:</span>
+        <span class="font-mono-code font-semibold text-[#17202A] tabular-nums" id="sessionTimer">00:08:42</span>
+      </div>
+    </div>
+
+    <!-- Right Controls: Weather & Quick Actions -->
+    <div class="flex items-center space-x-2">
+      <!-- 4 Atmospheric Lighting Presets -->
+      <div class="flex bg-[#F2F4F7] p-0.5 rounded border border-[#E4E7EC] text-xs">
+        <button onclick="setSimulationEnv('day')"   id="envBtnDay"   class="px-2 py-1 rounded text-[11px] font-medium transition text-[#475467] hover:text-[#17202A]">Day</button>
+        <button onclick="setSimulationEnv('night')" id="envBtnNight" class="px-2 py-1 rounded text-[11px] font-semibold transition bg-white shadow-xs text-blue-700">Night</button>
+        <button onclick="setSimulationEnv('fog')"   id="envBtnFog"   class="px-2 py-1 rounded text-[11px] font-medium transition text-[#475467] hover:text-[#17202A]">Fog</button>
+        <button onclick="setSimulationEnv('rain')"  id="envBtnRain"  class="px-2 py-1 rounded text-[11px] font-medium transition text-[#475467] hover:text-[#17202A]">Rain</button>
+      </div>
+
+      <div class="h-4 w-px bg-[#E4E7EC]"></div>
+
+      <button onclick="switchView('landing')" class="px-2.5 py-1 text-[11px] font-medium text-[#344054] hover:bg-[#F2F4F7] rounded border border-[#D0D5DD] transition flex items-center space-x-1">
+        <svg class="w-3.5 h-3.5 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <span>Portal</span>
+      </button>
+
+      <div class="w-7 h-7 rounded-full bg-[#E2E8F0] border border-[#CBD5E1] flex items-center justify-center text-xs font-semibold text-[#334155]" title="Lead Instructor">
+        INS
+      </div>
+    </div>
+  </header>
+
+  <!-- BODY: SIDEBAR + MAIN CONTENT AREA -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside class="w-56 bg-white border-r border-[#E4E7EC] flex flex-col justify-between shrink-0 z-20">
+      <div class="py-3 flex flex-col">
+        <div class="px-4 pb-2 text-[10px] font-semibold text-[#98A2B3] uppercase tracking-wider">
+          Instructor Navigation
+        </div>
+
+        <nav class="space-y-0.5 px-2" id="sidebarNav">
+          <button onclick="switchView('overview')" id="nav-overview" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            <span>Training Overview</span>
+          </button>
+
+          <button onclick="switchView('simulation')" id="nav-simulation" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition bg-blue-50 text-blue-700 font-semibold">
+            <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7v5l3 3"/></svg>
+            <span>Live 3D Simulation</span>
+            <span class="ml-auto w-2 h-2 rounded-full bg-blue-600"></span>
+          </button>
+
+          <button onclick="switchView('scenarios')" id="nav-scenarios" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <span>Scenario Builder</span>
+          </button>
+
+          <button onclick="switchView('trainees')" id="nav-trainees" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <span>Trainees</span>
+          </button>
+
+          <button onclick="switchView('aar')" id="nav-aar" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <span>After-Action Review</span>
+          </button>
+
+          <button onclick="switchView('analytics')" id="nav-analytics" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            <span>Analytics</span>
+          </button>
+
+          <button onclick="switchView('studio')" id="nav-studio" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            <span>Instructor Studio</span>
+          </button>
+
+          <button onclick="switchView('settings')" id="nav-settings" class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-medium transition text-[#344054] hover:bg-[#F8F9FA]">
+            <svg class="w-4 h-4 text-[#667085]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>Settings</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="p-3 border-t border-[#E4E7EC] bg-[#F8F9FA] space-y-2">
+        <div class="flex items-center justify-between text-[11px] text-[#475467]">
+          <span class="font-medium">C-UAS Hardware</span>
+          <span class="font-mono-code text-[10px] text-emerald-700 bg-emerald-100/60 px-1 py-0.5 rounded">60 FPS WebGL</span>
+        </div>
+        <div class="flex items-center space-x-2 pt-1 border-t border-[#EAECF0]">
+          <div class="w-7 h-7 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs">
+            AR
+          </div>
+          <div class="overflow-hidden">
+            <div class="text-xs font-semibold text-[#17202A] truncate">Officer Arun</div>
+            <div class="text-[10px] text-[#667085] truncate">C-UAS Trainee #08</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN VIEW AREA -->
+    <main class="flex-1 overflow-y-auto bg-[#F7F8FA]" id="mainContainer">
+
+      <!-- ========================================== -->
+      <!-- VIEW 1: LIVE 3D SIMULATION (DEFAULT)      -->
+      <!-- ========================================== -->
+      <div id="view-simulation" class="h-full flex flex-col p-3 space-y-2.5">
+        
+        <!-- Sub-header: Camera Modes, 1-Click Drone Focus & Quick Proximity -->
+        <div class="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#E4E7EC] shadow-xs shrink-0">
+          <div class="flex items-center space-x-3">
+            <span class="text-xs font-bold text-[#17202A] flex items-center space-x-1.5" id="simScenarioBadge">
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+              <span id="simScenarioTitle">TERRAIN: METROPOLIS CITY SECTOR</span>
+            </span>
+            <span class="text-xs text-[#98A2B3]">|</span>
+            <!-- 1-Click "SNAP & FOCUS DRONE" to make drone 100% visible immediately! -->
+            <button onclick="focusDroneCamera()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded shadow-xs transition flex items-center space-x-1.5 animate-bounce">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>FOCUS DRONE (CLEAR VIEW)</span>
+            </button>
+            <span class="text-xs text-[#98A2B3]">|</span>
+            <!-- Drone Distance Toggle: Close / Tactical / Distant -->
+            <div class="flex items-center space-x-1 text-xs">
+              <span class="text-[#667085] text-[11px] font-medium">Distance:</span>
+              <button onclick="setDroneDistance(40)"  id="distBtnClose" class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">Close (40m)</button>
+              <button onclick="setDroneDistance(120)" id="distBtnMed"   class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:bg-slate-100 border border-[#D0D5DD]">Tactical (120m)</button>
+              <button onclick="setDroneDistance(300)" id="distBtnFar"   class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:bg-slate-100 border border-[#D0D5DD]">Perimeter (300m)</button>
+            </div>
+          </div>
+
+          <!-- Camera Modes -->
+          <div class="flex items-center space-x-2 text-xs">
+            <span class="text-[#667085] text-[11px] font-medium">Camera:</span>
+            <div class="flex bg-[#F2F4F7] p-0.5 rounded border border-[#E4E7EC] text-xs">
+              <button onclick="setCameraMode('observer')" id="camBtnObserver" class="px-2 py-0.5 rounded text-[11px] font-semibold bg-white shadow-xs text-blue-700">Observer Eye-Level</button>
+              <button onclick="setCameraMode('tracking')" id="camBtnTracking" class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]">Target Track Lock</button>
+              <button onclick="setCameraMode('orbit')"    id="camBtnOrbit"    class="px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]">Free Orbit</button>
+            </div>
+
+            <!-- Optical Zoom -->
+            <div class="flex items-center space-x-1 pl-2 border-l border-[#E4E7EC]">
+              <span class="text-[11px] font-mono-code text-[#667085]">Zoom:</span>
+              <button onclick="adjustZoom(-0.5)" class="w-5 h-5 bg-[#F2F4F7] hover:bg-slate-200 rounded text-xs font-bold">-</button>
+              <span class="font-mono-code text-[11px] font-bold text-blue-700 px-1" id="zoomLevelDisplay">1.0x</span>
+              <button onclick="adjustZoom(0.5)" class="w-5 h-5 bg-[#F2F4F7] hover:bg-slate-200 rounded text-xs font-bold">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center Workspace: 3D WebGL Viewport + Right Tactical Telemetry -->
+        <div class="flex-1 flex gap-3 min-h-0">
+          
+          <!-- TRUE 3D SIMULATION CONTAINER -->
+          <div class="flex-1 bg-[#090D15] rounded-lg border border-[#D0D5DD] overflow-hidden flex flex-col relative shadow-sm" id="webglContainer">
+            
+            <div id="threeCanvasWrapper" class="relative w-full h-full flex-1 cursor-grab active:cursor-grabbing">
+              <!-- Three.js Canvas Injected Here -->
+
+              <!-- Active Bounding Reticle Box -->
+              <div id="hudReticle" class="hud-reticle-box w-28 h-28 pointer-events-none">
+                <div class="hud-corner top-0 left-0 border-t-2 border-l-2"></div>
+                <div class="hud-corner top-0 right-0 border-t-2 border-r-2"></div>
+                <div class="hud-corner bottom-0 left-0 border-b-2 border-l-2"></div>
+                <div class="hud-corner bottom-0 right-0 border-b-2 border-r-2"></div>
+                <div class="absolute -top-5 left-0 text-[10px] font-mono-code font-bold bg-blue-700 text-white px-1.5 py-0.2 rounded shadow whitespace-nowrap" id="reticleTag">
+                  TARGET LOCK: ROTARY DRONE
+                </div>
+              </div>
+
+              <!-- Optical Central Precision Crosshair -->
+              <div class="crosshair-center pointer-events-none opacity-30">
+                <div class="w-8 h-px bg-white"></div>
+                <div class="h-8 w-px bg-white mx-auto -mt-4"></div>
+              </div>
+
+              <!-- Live Observer Station Telemetry (Top Left) -->
+              <div class="absolute top-3 left-3 pointer-events-none text-white/90 font-mono-code text-[11px] space-y-1 select-none bg-black/50 backdrop-blur-xs p-2.5 rounded border border-white/10 shadow-lg">
+                <div class="flex items-center space-x-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span class="font-bold tracking-wider" id="camTitleText">STATION: EYE-LEVEL PERIMETER WATCH</span>
+                </div>
+                <div class="text-white/70 text-[10px] space-x-3">
+                  <span id="telemetryModel">MODEL: COMMERCIAL QUAD</span>
+                  <span id="telemetryElevation">ELEV: +16.2&deg;</span>
+                  <span id="telemetryRange" class="text-blue-300 font-bold">RNG: 42m (CLEAR VISUAL)</span>
+                  <span id="telemetryFOV">FOV: 55&deg;</span>
+                </div>
+              </div>
+
+              <!-- Real-Time Drone Customizer Drawer Toggle Button (Top Right) -->
+              <div class="absolute top-3 right-3 flex items-center space-x-2">
+                <button onclick="toggleDroneCustomizer()" class="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs rounded-md shadow-md transition flex items-center space-x-1.5 border border-blue-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                  <span>CUSTOMIZE DRONE &amp; FLIGHT</span>
+                </button>
+              </div>
+
+              <!-- Real-Time Tactical Radar Minimap (Bottom Left) -->
+              <div class="absolute bottom-3 left-3 w-40 h-40 bg-slate-950/90 border border-slate-700/80 rounded-lg p-2 backdrop-blur-sm flex flex-col items-center justify-between shadow-xl">
+                <div class="w-full flex items-center justify-between text-[10px] font-mono-code text-slate-300 pb-1 border-b border-slate-800">
+                  <span class="font-bold text-blue-400">RADAR 3D</span>
+                  <span class="text-emerald-400 text-[9px]">LPI-20 SWEEP</span>
+                </div>
+                <div class="relative w-28 h-28 my-auto border border-slate-700 rounded-full flex items-center justify-center overflow-hidden bg-slate-900/60">
+                  <div class="absolute w-20 h-20 border border-slate-700/60 rounded-full"></div>
+                  <div class="absolute w-10 h-10 border border-slate-700/60 rounded-full"></div>
+                  <div class="absolute w-full h-px bg-slate-700/60"></div>
+                  <div class="absolute h-full w-px bg-slate-700/60"></div>
+                  <div class="absolute inset-0 radar-sweep pointer-events-none"></div>
+                  <!-- Dynamic Radar Blips -->
+                  <div id="radarBlip1" class="absolute w-1.5 h-1.5 bg-amber-400 rounded-full shadow-sm" style="top: 30%; left: 62%;"></div>
+                  <div id="radarBlip2" class="absolute w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-sm" style="top: 70%; left: 35%;"></div>
+                  <div id="radarBlip3" class="absolute w-2.5 h-2.5 bg-blue-400 rounded-full ring-2 ring-blue-300 animate-pulse" style="top: 42%; left: 54%;"></div>
+                  <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+                </div>
+                <div class="w-full text-center text-[9px] font-mono-code text-slate-400">
+                  AZ: 034&deg; INBOUND LOCK
+                </div>
+              </div>
+
+              <!-- Quick Interaction Pill -->
+              <div class="absolute bottom-3 right-3 text-[10px] font-mono-code text-white/70 bg-black/60 backdrop-blur-xs px-3 py-1.5 rounded border border-white/10 flex items-center space-x-2">
+                <span>Left Click: Rotate</span>
+                <span>&bull;</span>
+                <span>Scroll: Zoom</span>
+                <span>&bull;</span>
+                <span>Right Click: Pan</span>
+              </div>
+            </div>
+
+            <!-- Trainee Interactive Response Command Bar -->
+            <div class="bg-white border-t border-[#E4E7EC] p-2.5 flex items-center justify-between text-xs shrink-0 z-10">
+              <div class="flex items-center space-x-6">
+                <!-- Classification Options -->
+                <div class="flex items-center space-x-2">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-[#667085]">1. Classify Object:</span>
+                  <div class="flex bg-[#F2F4F7] p-0.5 rounded border border-[#E4E7EC]">
+                    <button onclick="handleClassify('DRONE')" id="btnClassifyDrone" class="px-3 py-1 font-semibold rounded transition text-[#344054] hover:bg-white">DRONE</button>
+                    <button onclick="handleClassify('NON-THREAT')" id="btnClassifyNonThreat" class="px-3 py-1 font-semibold rounded transition text-[#344054] hover:bg-white">NON-THREAT</button>
+                    <button onclick="handleClassify('UNKNOWN')" id="btnClassifyUnknown" class="px-3 py-1 font-semibold rounded transition bg-white shadow-xs text-blue-700">UNKNOWN</button>
+                  </div>
+                </div>
+
+                <!-- Tactical Response Options -->
+                <div class="flex items-center space-x-2">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-[#667085]">2. Tactical Action:</span>
+                  <div class="flex bg-[#F2F4F7] p-0.5 rounded border border-[#E4E7EC]">
+                    <button onclick="handleResponse('MONITOR')" id="btnRespMonitor" class="px-3 py-1 font-semibold rounded transition bg-white shadow-xs text-slate-800">MONITOR</button>
+                    <button onclick="handleResponse('VERIFY')" id="btnRespVerify" class="px-3 py-1 font-semibold rounded transition text-[#344054] hover:bg-white">VERIFY (ZOOM/RF)</button>
+                    <button onclick="handleResponse('ALERT')" id="btnRespAlert" class="px-3 py-1 font-semibold rounded transition text-red-700 hover:bg-red-50">DEFENSE ALERT</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Trainee Submission Feedback -->
+              <div class="flex items-center space-x-2">
+                <span id="decisionFeedback" class="text-xs font-medium text-slate-600 bg-[#F8F9FA] px-2.5 py-1 rounded border border-[#E4E7EC]">
+                  Select target track &amp; classify threat
+                </span>
+                <button onclick="submitTraineeDecision()" class="px-3.5 py-1 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded shadow-xs transition">
+                  Commit Decision
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT PANEL: 3D OBJECT TRACKS & FOG OF TRUTH TELEMETRY (280px wide) -->
+          <div class="w-72 bg-white rounded-lg border border-[#E4E7EC] flex flex-col justify-between overflow-hidden shadow-xs shrink-0">
+            <div class="p-3 border-b border-[#E4E7EC]">
+              <div class="flex items-center justify-between">
+                <div class="text-xs font-bold text-[#17202A] uppercase tracking-wider">3D Tracks (3 Detected)</div>
+                <span class="text-[10px] font-mono-code bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">RADAR LOCK</span>
+              </div>
+              <p class="text-[11px] text-[#667085] mt-0.5">Click any track to focus 3D camera</p>
+            </div>
+
+            <!-- Track List -->
+            <div class="p-2 space-y-1.5 overflow-y-auto max-h-48">
+              <!-- Track 1: Unknown Decoy -->
+              <div onclick="selectTrack(1)" id="trackCard1" class="p-2 rounded border border-[#E4E7EC] hover:border-blue-400 bg-white cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-[#17202A] flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Object #01</span>
+                  </span>
+                  <span class="text-[10px] font-mono-code font-semibold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">INTERMITTENT</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-[11px] text-[#667085]">
+                  <span>Class: Unknown Decoy</span>
+                  <span class="font-mono-code">Conf: <strong class="text-[#17202A]">54%</strong></span>
+                </div>
+              </div>
+
+              <!-- Track 2: Bird -->
+              <div onclick="selectTrack(2)" id="trackCard2" class="p-2 rounded border border-[#E4E7EC] hover:border-blue-400 bg-white cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-[#17202A] flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Object #02</span>
+                  </span>
+                  <span class="text-[10px] font-mono-code font-semibold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">STABLE</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-[11px] text-[#667085]">
+                  <span>Class: Biological (Bird)</span>
+                  <span class="font-mono-code">Conf: <strong class="text-[#17202A]">71%</strong></span>
+                </div>
+              </div>
+
+              <!-- Track 3: Drone (Selected) -->
+              <div onclick="selectTrack(3)" id="trackCard3" class="p-2 rounded border-2 border-blue-600 bg-blue-50/40 cursor-pointer transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-blue-900 flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-blue-600 ring-2 ring-blue-300"></span>
+                    <span>Object #03 (Active Threat)</span>
+                  </span>
+                  <span class="text-[10px] font-mono-code font-semibold px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 border border-blue-300">ACTIVE LOCK</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-[11px] text-[#344054]">
+                  <span>Class: Drone (Commercial Quad)</span>
+                  <span class="font-mono-code">Conf: <strong class="text-blue-900">87%</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- FOG OF TRUTH: OBJECT INSPECTION TELEMETRY -->
+            <div class="p-3 border-t border-[#E4E7EC] bg-[#F8F9FA] flex-1 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between pb-2 border-b border-[#E4E7EC]">
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-[#17202A]" id="detailObjTitle">Inspection: Object #03</span>
+                  <span class="text-[10px] font-mono-code px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-200">EVALUATION LOCK</span>
+                </div>
+
+                <div class="mt-2.5 space-y-2 text-xs">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[#667085]">3D Euclidean Distance</span>
+                    <span class="font-mono-code font-bold text-blue-700 text-sm" id="detailDistance">42 m (Visual Lock)</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-[#667085]">Azimuth / Bearing</span>
+                    <span class="font-mono-code font-semibold text-[#17202A]" id="detailBearing">034.2&deg; North-East</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-[#667085]">Velocity Doppler</span>
+                    <span class="font-mono-code font-semibold text-[#17202A]" id="detailSpeed">12.4 m/s (Inbound)</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-[#667085]">Sensor Confidence</span>
+                    <div class="flex items-center space-x-1.5">
+                      <div class="w-16 bg-[#E4E7EC] h-1.5 rounded-full overflow-hidden">
+                        <div class="bg-blue-600 h-full rounded-full" id="detailConfBar" style="width: 87%"></div>
+                      </div>
+                      <span class="font-mono-code font-bold text-[#17202A]" id="detailConfidence">87%</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-[#667085]">Track Quality</span>
+                    <span class="text-[11px] font-mono-code font-semibold text-emerald-700" id="detailTrackQuality">STABLE DUAL-BAND</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-[#667085]">Visual Condition</span>
+                    <span class="text-[11px] font-medium text-blue-700 font-semibold" id="detailVisualCondition">DIRECT CLOSE-RANGE VISUAL</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Fog of Truth Notice -->
+              <div class="mt-2 p-2 rounded bg-amber-50/70 border border-amber-200 text-[10px] text-amber-900 leading-relaxed">
+                <strong>Fog of Truth Enforced:</strong> Actual payload threat ground truth is withheld until debrief to prevent verification bias.
+              </div>
+            </div>
+
+            <!-- Mini GIS Tactical Map at Bottom -->
+            <div class="p-2 border-t border-[#E4E7EC] bg-white">
+              <div class="text-[10px] font-bold text-[#667085] uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span>Tactical GIS Zone</span>
+                <span class="text-[9px] text-[#98A2B3]">RNG 1.2 KM</span>
+              </div>
+              <div class="relative w-full h-18 bg-[#F2F4F7] rounded border border-[#E4E7EC] overflow-hidden flex items-center justify-center">
+                <div class="absolute inset-0" style="background-image: radial-gradient(#D0D5DD 1px, transparent 1px); background-size: 14px 14px;"></div>
+                <div class="absolute w-24 h-12 border-2 border-dashed border-red-400 bg-red-500/10 rounded flex items-center justify-center pointer-events-none">
+                  <span class="text-[7px] font-mono-code font-bold text-red-600 uppercase tracking-widest">DEFENSE SECTOR</span>
+                </div>
+                <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                  <div class="w-2 h-2 rounded-full bg-blue-700 border border-white shadow"></div>
+                  <span class="text-[7px] font-mono-code text-[#475467]">OBS-01</span>
+                </div>
+                <div id="gisTargetDot" class="absolute w-2.5 h-2.5 rounded-full bg-blue-600 ring-2 ring-blue-300 transition-all duration-200" style="top: 25%; left: 58%;"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- MODAL: DRONE CUSTOMIZER & HANGAR           -->
+      <!-- ========================================== -->
+      <div id="droneCustomizerModal" class="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl border border-[#E4E7EC] shadow-2xl w-full max-w-xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between pb-3 border-b border-[#E4E7EC]">
+            <div>
+              <h2 class="text-base font-bold text-[#17202A]">Threat Drone Customizer &amp; Hangar</h2>
+              <p class="text-xs text-[#667085]">Select 3D aircraft model, threat payload, flight envelope &amp; lighting</p>
+            </div>
+            <button onclick="toggleDroneCustomizer()" class="text-slate-400 hover:text-slate-700 text-lg font-bold">&times;</button>
+          </div>
+
+          <!-- 1. Drone Model Type Selector -->
+          <div>
+            <label class="block text-xs font-bold text-[#17202A] mb-1.5">1. Aircraft Architecture:</label>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <button onclick="setDroneModelType('quadcopter')" id="mdlBtnQuad" class="p-2.5 rounded-lg border-2 border-blue-600 bg-blue-50 text-blue-900 font-bold text-left">
+                <div class="text-xs">Quadcopter</div>
+                <div class="text-[10px] text-blue-700 font-normal mt-0.5">Commercial 4-Rotor</div>
+              </button>
+              <button onclick="setDroneModelType('fixedwing')" id="mdlBtnFixed" class="p-2.5 rounded-lg border border-[#D0D5DD] bg-white text-slate-800 font-medium text-left hover:bg-slate-50">
+                <div class="text-xs">Fixed-Wing</div>
+                <div class="text-[10px] text-slate-500 font-normal mt-0.5">Surveillance Glider</div>
+              </button>
+              <button onclick="setDroneModelType('hexacopter')" id="mdlBtnHexa" class="p-2.5 rounded-lg border border-[#D0D5DD] bg-white text-slate-800 font-medium text-left hover:bg-slate-50">
+                <div class="text-xs">Hexacopter</div>
+                <div class="text-[10px] text-slate-500 font-normal mt-0.5">6-Rotor Heavy Lift</div>
+              </button>
+              <button onclick="setDroneModelType('fpv')" id="mdlBtnFpv" class="p-2.5 rounded-lg border border-[#D0D5DD] bg-white text-slate-800 font-medium text-left hover:bg-slate-50">
+                <div class="text-xs">Micro-FPV</div>
+                <div class="text-[10px] text-slate-500 font-normal mt-0.5">High-Speed Evasion</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Distance and Altitude Sliders -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-[#475467] font-semibold">Distance from Observer:</span>
+                <span class="font-mono-code font-bold text-blue-700" id="custDistLabel">40 m</span>
+              </div>
+              <input type="range" min="20" max="300" value="40" step="5" id="custDistSlider" oninput="updateCustomizerDistance(this.value)" class="w-full cursor-pointer accent-blue-600">
+              <div class="flex justify-between text-[10px] text-slate-400 mt-0.5 font-mono-code">
+                <span>20m (Ultra-Close)</span>
+                <span>300m (Perimeter)</span>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-[#475467] font-semibold">Flight Altitude:</span>
+                <span class="font-mono-code font-bold text-blue-700" id="custAltLabel">28 m</span>
+              </div>
+              <input type="range" min="10" max="100" value="28" step="2" id="custAltSlider" oninput="updateCustomizerAltitude(this.value)" class="w-full cursor-pointer accent-blue-600">
+              <div class="flex justify-between text-[10px] text-slate-400 mt-0.5 font-mono-code">
+                <span>10m (Rooftop)</span>
+                <span>100m (High Air)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Threat Payload & Lighting -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <label class="block text-xs font-bold text-[#17202A] mb-1">Threat Payload Equipped:</label>
+              <select id="custPayloadSelect" onchange="updateCustomizerPayload(this.value)" class="w-full border border-[#D0D5DD] rounded-lg p-2 text-xs bg-white font-medium">
+                <option value="camera" selected>EO/IR Optical Surveillance Turret</option>
+                <option value="cargo">Suspended Dropper / Cargo Pod</option>
+                <option value="jammer">Electronic RF Jamming Antenna</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-[#17202A] mb-1">Navigation Lighting:</label>
+              <select id="custLightingSelect" onchange="updateCustomizerLighting(this.value)" class="w-full border border-[#D0D5DD] rounded-lg p-2 text-xs bg-white font-medium">
+                <option value="strobe" selected>Pulsating High-Intensity White Strobe</option>
+                <option value="military">FAA Port Red &amp; Starboard Green</option>
+                <option value="stealth">Stealth Blackout (Lights Dark)</option>
+                <option value="amber">Hazard Warning Amber Beacon</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 4. Flight Trajectory Pattern -->
+          <div class="pt-2">
+            <label class="block text-xs font-bold text-[#17202A] mb-1">Flight Behavior &amp; Trajectory:</label>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <button onclick="setFlightPattern('hover')" id="patBtnHover" class="p-2 rounded border-2 border-blue-600 bg-blue-50 font-bold text-blue-900 text-center">
+                Station Hover
+              </button>
+              <button onclick="setFlightPattern('figure8')" id="patBtnFig8" class="p-2 rounded border border-[#D0D5DD] hover:bg-slate-50 font-medium text-slate-800 text-center">
+                Figure-8 Orbit
+              </button>
+              <button onclick="setFlightPattern('incursion')" id="patBtnIncur" class="p-2 rounded border border-[#D0D5DD] hover:bg-slate-50 font-medium text-slate-800 text-center">
+                Inbound Incursion
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-[#E4E7EC] flex space-x-2">
+            <button onclick="toggleDroneCustomizer(); focusDroneCamera();" class="flex-1 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs rounded-lg transition shadow">
+              APPLY SETTINGS &amp; VIEW DRONE
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 2: TRAINING OVERVIEW DASHBOARD       -->
+      <!-- ========================================== -->
+      <div id="view-overview" class="p-6 max-w-7xl mx-auto space-y-6 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-[#17202A] tracking-tight">Training Overview</h1>
+            <p class="text-sm text-[#667085] mt-1">Monitor trainee performance, simulation sessions, and adaptive training progress.</p>
+          </div>
+          <button onclick="switchView('simulation')" class="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-md shadow-xs transition flex items-center space-x-1.5">
+            <span>Resume Live Simulation</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="bg-white p-4 rounded-lg border border-[#E4E7EC] shadow-xs">
+            <div class="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">Total Sessions</div>
+            <div class="text-2xl font-bold text-[#17202A] mt-1">18</div>
+            <div class="text-[11px] text-emerald-600 mt-1 flex items-center font-medium">&uarr; +4 this week</div>
+          </div>
+
+          <div class="bg-white p-4 rounded-lg border border-[#E4E7EC] shadow-xs">
+            <div class="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">Detection Acc.</div>
+            <div class="text-2xl font-bold text-[#17202A] mt-1">91%</div>
+            <div class="text-[11px] text-[#667085] mt-1">Benchmark: 85%</div>
+          </div>
+
+          <div class="bg-white p-4 rounded-lg border border-[#E4E7EC] shadow-xs">
+            <div class="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">Classify Acc.</div>
+            <div class="text-2xl font-bold text-amber-700 mt-1">79%</div>
+            <div class="text-[11px] text-amber-600 mt-1">Needs attention</div>
+          </div>
+
+          <div class="bg-white p-4 rounded-lg border border-[#E4E7EC] shadow-xs">
+            <div class="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">Decision Acc.</div>
+            <div class="text-2xl font-bold text-[#17202A] mt-1">86%</div>
+            <div class="text-[11px] text-emerald-600 mt-1">&uarr; +3% vs Cohort</div>
+          </div>
+
+          <div class="bg-white p-4 rounded-lg border border-[#E4E7EC] shadow-xs">
+            <div class="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">False-Alarm Rate</div>
+            <div class="text-2xl font-bold text-[#17202A] mt-1">12%</div>
+            <div class="text-[11px] text-[#667085] mt-1">Target &le; 10%</div>
+          </div>
+
+          <div class="bg-white p-4 rounded-lg border border-[#E4E7EC] shadow-xs">
+            <div class="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">Missed-Threat Rate</div>
+            <div class="text-2xl font-bold text-emerald-700 mt-1">6%</div>
+            <div class="text-[11px] text-emerald-600 mt-1">Critical threshold met</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-white p-5 rounded-lg border border-[#E4E7EC] shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between pb-3 border-b border-[#E4E7EC]">
+              <div>
+                <h3 class="text-sm font-bold text-[#17202A]">Trainee Performance Over Time</h3>
+                <p class="text-xs text-[#667085]">Sequential sessions 01 &rarr; 18 for Officer Arun</p>
+              </div>
+              <div class="flex items-center space-x-4 text-xs font-medium text-[#475467]">
+                <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-blue-700 inline-block"></span><span>Detection</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-amber-600 inline-block"></span><span>Classification</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-slate-600 inline-block"></span><span>Decision</span></span>
+              </div>
+            </div>
+
+            <div class="h-64 w-full my-3">
+              <canvas id="performanceTrendChart" class="w-full h-full block"></canvas>
+            </div>
+
+            <div class="pt-2 border-t border-[#F2F4F7] flex items-center justify-between text-xs text-[#667085]">
+              <span>Consistent upward trajectory in detection latency and response validation.</span>
+              <span class="font-mono-code font-semibold text-[#17202A]">Latest: Session 18 (Score: 84%)</span>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-[#E4E7EC] shadow-xs flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between pb-3 border-b border-[#E4E7EC]">
+                <h3 class="text-sm font-bold text-[#17202A]">Adaptive Training Status</h3>
+                <span class="text-[10px] font-mono-code font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">AI ENGINE</span>
+              </div>
+
+              <div class="mt-4 space-y-3.5 text-xs">
+                <div>
+                  <div class="text-[11px] text-[#667085] uppercase tracking-wider">Current Trainee</div>
+                  <div class="font-bold text-sm text-[#17202A] mt-0.5">OFFICER ARUN</div>
+                </div>
+
+                <div>
+                  <div class="text-[11px] text-[#667085] uppercase tracking-wider">Detected Weakness</div>
+                  <div class="font-medium text-amber-900 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
+                    Classification under uncertain sensor conditions (degraded visibility &amp; intermittent RF tracks)
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-[#667085]">Current Weakness Score</span>
+                    <span class="font-mono-code font-bold text-amber-700">66% Accuracy</span>
+                  </div>
+                  <div class="w-full bg-[#E4E7EC] h-2 rounded-full mt-1 overflow-hidden">
+                    <div class="bg-amber-600 h-full rounded-full" style="width: 66%"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-[11px] text-[#667085] uppercase tracking-wider">Recommended Adaptive Drill</div>
+                  <div class="font-medium text-[#17202A] mt-0.5">Ambiguous aerial objects under degraded visibility</div>
+                  <div class="text-[11px] font-mono-code text-[#667085] mt-0.5">Preset: Mountain Valley / Dense Fog</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-3 border-t border-[#E4E7EC]">
+              <button onclick="switchTerrain('mountain'); setSimulationEnv('fog'); switchView('simulation');" class="w-full py-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs rounded transition flex items-center justify-center space-x-1.5">
+                <span>DEPLOY ADAPTIVE MOUNTAIN DRILL</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 3: SCENARIO BUILDER                   -->
+      <!-- ========================================== -->
+      <div id="view-scenarios" class="p-6 max-w-7xl mx-auto space-y-6 hidden">
+        <div>
+          <h1 class="text-2xl font-bold text-[#17202A] tracking-tight">Scenario Builder</h1>
+          <p class="text-sm text-[#667085] mt-1">Deploy 3D terrain configurations and AI-generated drills.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-lg border border-[#E4E7EC] shadow-xs space-y-4">
+            <h3 class="text-sm font-bold text-[#17202A] pb-2 border-b border-[#E4E7EC]">Select Battlespace Environment</h3>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div onclick="switchTerrain('city'); switchView('simulation');" class="p-3 border-2 border-blue-600 rounded-lg bg-blue-50/40 cursor-pointer hover:bg-blue-50">
+                <div class="font-bold text-[#17202A]">Metropolis City Sector</div>
+                <div class="text-[#667085] mt-1">High-rise buildings, asphalt highways &amp; streetlights</div>
+              </div>
+              <div onclick="switchTerrain('mountain'); switchView('simulation');" class="p-3 border border-[#D0D5DD] rounded-lg bg-white cursor-pointer hover:bg-slate-50">
+                <div class="font-bold text-[#17202A]">Mountain Ridge &amp; Valley</div>
+                <div class="text-[#667085] mt-1">Rugged terrain elevation, watchtower &amp; pine forests</div>
+              </div>
+              <div onclick="switchTerrain('village'); switchView('simulation');" class="p-3 border border-[#D0D5DD] rounded-lg bg-white cursor-pointer hover:bg-slate-50">
+                <div class="font-bold text-[#17202A]">Rural Village &amp; Farmland</div>
+                <div class="text-[#667085] mt-1">Cottages, barns, fences, dirt roads &amp; orchard trees</div>
+              </div>
+              <div onclick="switchTerrain('port'); switchView('simulation');" class="p-3 border border-[#D0D5DD] rounded-lg bg-white cursor-pointer hover:bg-slate-50">
+                <div class="font-bold text-[#17202A]">Coastal Port Asset</div>
+                <div class="text-[#667085] mt-1">Water surface, shipping containers &amp; dock cranes</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-[#E4E7EC] shadow-xs flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-[#17202A] pb-2 border-b border-[#E4E7EC]">Natural Language AI Generator</h3>
+              <textarea id="nlInputPrompt" rows="3" class="mt-3 w-full border border-[#D0D5DD] rounded-lg p-2.5 text-xs text-[#17202A]" placeholder="Describe your drill...">Deploy a mountain valley scenario during dense fog with a fixed-wing reconnaissance drone hovering at 80m altitude.</textarea>
+              <button onclick="switchTerrain('mountain'); setSimulationEnv('fog'); setDroneModelType('fixedwing'); switchView('simulation');" class="mt-3 w-full py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs rounded transition">
+                COMPILE &amp; DEPLOY TO 3D SIMULATOR
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 4: AFTER-ACTION REVIEW                -->
+      <!-- ========================================== -->
+      <div id="view-aar" class="p-6 max-w-7xl mx-auto space-y-6 hidden">
+        <div class="flex items-center justify-between pb-4 border-b border-[#E4E7EC]">
+          <div>
+            <span class="text-xs font-mono-code font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">SCENARIO TV-087</span>
+            <h1 class="text-2xl font-bold text-[#17202A] tracking-tight mt-1">After-Action Review (AAR)</h1>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-[#667085] uppercase tracking-wider block">Session Score</span>
+            <span class="text-3xl font-bold text-blue-700 font-mono-code">84%</span>
+          </div>
+        </div>
+
+        <!-- "WHAT DID I KNOW THEN?" -->
+        <div class="bg-white rounded-lg border-2 border-blue-600/80 shadow-md p-5 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-[#E4E7EC]">
+            <h2 class="text-base font-bold text-[#17202A] tracking-wider uppercase">Signature Feature: What Did I Know Then?</h2>
+            <span class="text-xs font-mono-code bg-blue-50 text-blue-800 px-2 py-1 rounded border border-blue-200">HISTORICAL RECONSTRUCTION</span>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-[#667085]">Replay Scrub Timeline:</span>
+              <span class="font-mono-code font-bold text-blue-700 text-sm" id="replayScrubLabel">T + 00:05</span>
+            </div>
+            <input type="range" min="0" max="16" value="5" step="1" id="replaySlider" oninput="updateReplayTimeline(this.value)" class="w-full cursor-pointer accent-blue-700">
+            <div class="flex justify-between text-[10px] font-mono-code text-[#98A2B3]">
+              <span>00:00 (Entry)</span>
+              <span class="text-blue-700 font-bold">00:05 (Detection)</span>
+              <span>00:11 (Response)</span>
+              <span>00:16 (Complete)</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+            <div class="p-3 bg-[#F8F9FA] rounded border border-[#E4E7EC]">
+              <div class="text-[10px] font-medium text-[#667085] uppercase">Distance</div>
+              <div class="text-sm font-bold font-mono-code text-[#17202A] mt-1" id="histDistance">&asymp; 800 m</div>
+            </div>
+            <div class="p-3 bg-[#F8F9FA] rounded border border-[#E4E7EC]">
+              <div class="text-[10px] font-medium text-[#667085] uppercase">Direction</div>
+              <div class="text-sm font-bold font-mono-code text-[#17202A] mt-1" id="histDirection">034&deg; North-East</div>
+            </div>
+            <div class="p-3 bg-[#F8F9FA] rounded border border-[#E4E7EC]">
+              <div class="text-[10px] font-medium text-[#667085] uppercase">Confidence</div>
+              <div class="text-sm font-bold font-mono-code text-blue-700 mt-1" id="histConfidence">54%</div>
+            </div>
+            <div class="p-3 bg-[#F8F9FA] rounded border border-[#E4E7EC]">
+              <div class="text-[10px] font-medium text-[#667085] uppercase">Visual State</div>
+              <div class="text-xs font-semibold text-amber-800 mt-1" id="histVisual">Partially Obscured</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 5, 6, 7, 8, 9 (Trainees, Analytics, Studio, Settings, Landing) -->
+      <!-- ========================================== -->
+      <div id="view-trainees" class="p-6 max-w-7xl mx-auto space-y-6 hidden">
+        <h1 class="text-2xl font-bold text-[#17202A]">Trainee Roster</h1>
+        <div class="grid grid-cols-4 gap-4 text-xs">
+          <div class="p-4 bg-white rounded-lg border border-[#E4E7EC]">
+            <div class="font-bold text-sm">Officer Arun</div>
+            <div class="text-blue-700 font-mono-code font-bold mt-1">91% ACCURACY</div>
+          </div>
+          <div class="p-4 bg-white rounded-lg border border-[#E4E7EC]">
+            <div class="font-bold text-sm">Officer Mehmet</div>
+            <div class="text-blue-700 font-mono-code font-bold mt-1">87% ACCURACY</div>
+          </div>
+          <div class="p-4 bg-white rounded-lg border border-[#E4E7EC]">
+            <div class="font-bold text-sm">Officer Priya</div>
+            <div class="text-blue-700 font-mono-code font-bold mt-1">84% ACCURACY</div>
+          </div>
+          <div class="p-4 bg-white rounded-lg border border-[#E4E7EC]">
+            <div class="font-bold text-sm">Officer Chen</div>
+            <div class="text-amber-700 font-mono-code font-bold mt-1">79% ACCURACY</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-analytics" class="p-6 max-w-7xl mx-auto space-y-6 hidden">
+        <h1 class="text-2xl font-bold text-[#17202A]">Platform Analytics</h1>
+        <div class="p-5 bg-white rounded-lg border border-[#E4E7EC]">
+          <h3 class="text-xs font-bold uppercase text-[#667085]">Detection Trends</h3>
+          <div class="h-40 w-full mt-2">
+            <canvas id="chartDetectTrend" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-studio" class="p-6 max-w-7xl mx-auto space-y-6 hidden">
+        <h1 class="text-2xl font-bold text-[#17202A]">Instructor Studio</h1>
+        <div class="p-5 bg-white rounded-lg border border-[#E4E7EC]">
+          <button onclick="setSimulationEnv('fog'); switchView('simulation');" class="px-4 py-2 bg-amber-600 text-white rounded text-xs font-bold">Inject Fog Disruption</button>
+        </div>
+      </div>
+
+      <div id="view-settings" class="p-6 max-w-4xl mx-auto space-y-6 hidden">
+        <h1 class="text-2xl font-bold text-[#17202A]">System Settings</h1>
+        <div class="p-5 bg-white rounded-lg border border-[#E4E7EC] text-xs">
+          <div>Three.js WebGL GPU Acceleration: ACTIVE (60 FPS)</div>
+        </div>
+      </div>
+
+      <div id="view-landing" class="p-8 max-w-5xl mx-auto space-y-8 hidden">
+        <div class="text-center space-y-3 pt-6">
+          <h1 class="text-4xl font-extrabold text-[#17202A]">THREATVERSE</h1>
+          <p class="text-lg text-[#344054]">AI-Enabled Adaptive 3D Drone &amp; Counter-Drone Threat Simulation Trainer</p>
+          <div class="pt-4">
+            <button onclick="switchView('simulation')" class="px-5 py-2.5 bg-blue-700 text-white font-semibold text-xs rounded-md shadow">
+              Launch Live 3D Simulation
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT: THREE.JS 3D WORLD & ENGINES   -->
+  <!-- ========================================== -->
+  <script>
+    const state = {
+      currentView: 'simulation',
+      simEnv: 'night',
+      currentTerrain: 'city', // 'city' | 'mountain' | 'village' | 'port'
+      droneType: 'quadcopter', // 'quadcopter' | 'fixedwing' | 'hexacopter' | 'fpv'
+      droneDist: 40, // 40m = Close & crystal clear!
+      droneAlt: 28,
+      droneSpeed: 1.0,
+      flightPattern: 'hover', // 'hover' | 'figure8' | 'incursion'
+      payloadType: 'camera',
+      lightingType: 'strobe',
+      cameraMode: 'observer',
+      zoomFactor: 1.0,
+      selectedTrackId: 3,
+      userClassification: 'UNKNOWN',
+      userResponse: 'MONITOR',
+      sessionSeconds: 8 * 60 + 42
+    };
+
+    // THREE.JS GLOBALS
+    let scene, camera, renderer, controls;
+    let environmentGroup; // Contains current terrain (buildings / mountains / village / port)
+    let droneGroup;
+    let droneRotors = [];
+    let droneStrobeMesh;
+    let birdGroup, birdWings = [];
+    let dirSunLight, hemiLight;
+    let rainParticles, rainGeo;
+    let streetPointLights = [];
+    let clock = new THREE.Clock();
+
+    function initThreeEngine() {
+      const container = document.getElementById('threeCanvasWrapper');
+      if (!container) return;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0C121E);
+      scene.fog = new THREE.FogExp2(0x0C121E, 0.0022);
+
+      camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.5, 3000);
+      camera.position.set(0, 14, 80);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+      container.appendChild(renderer.domElement);
+
+      if (typeof THREE.OrbitControls !== 'undefined') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
+        controls.minDistance = 2;
+        controls.maxDistance = 1200;
+        controls.target.set(0, 20, 0);
+      }
+
+      hemiLight = new THREE.HemisphereLight(0x3B506B, 0x1A202C, 0.65);
+      scene.add(hemiLight);
+
+      dirSunLight = new THREE.DirectionalLight(0xFFFFFF, 1.4);
+      dirSunLight.position.set(100, 200, 80);
+      dirSunLight.castShadow = true;
+      dirSunLight.shadow.mapSize.width = 2048;
+      dirSunLight.shadow.mapSize.height = 2048;
+      dirSunLight.shadow.bias = -0.0005;
+      scene.add(dirSunLight);
+
+      // Environment Group container
+      environmentGroup = new THREE.Group();
+      scene.add(environmentGroup);
+
+      // Build City Terrain by Default
+      buildMetropolisCity();
+
+      // Build Customizable Drone
+      rebuildDroneModel();
+
+      // Non-Threat Animated Birds
+      buildBiologicalBirds();
+
+      // Rain Particles
+      buildRainSystem();
+
+      setSimulationEnv('night');
+      animateThree();
+    }
+
+    // ==========================================
+    // 1. TERRAIN BUILDERS: CITY, MOUNTAINS, VILLAGE, PORT
+    // ==========================================
+    function clearCurrentTerrain() {
+      streetPointLights = [];
+      while (environmentGroup.children.length > 0) {
+        const obj = environmentGroup.children[0];
+        environmentGroup.remove(obj);
+      }
+    }
+
+    function switchTerrain(type) {
+      state.currentTerrain = type;
+      clearCurrentTerrain();
+
+      ['city', 'mountain', 'village', 'port'].forEach(t => {
+        const btn = document.getElementById(`trnBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (btn) {
+          if (t === type) {
+            btn.className = 'px-2 py-0.5 rounded text-[11px] font-semibold bg-white shadow-xs text-blue-700';
+          } else {
+            btn.className = 'px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]';
+          }
+        }
+      });
+
+      const titleEl = document.getElementById('simScenarioTitle');
+
+      if (type === 'city') {
+        buildMetropolisCity();
+        titleEl.innerText = 'TERRAIN: METROPOLIS CITY SECTOR';
+      } else if (type === 'mountain') {
+        buildMountainValley();
+        titleEl.innerText = 'TERRAIN: MOUNTAIN RIDGE & VALLEY OUTPOST';
+      } else if (type === 'village') {
+        buildRuralVillage();
+        titleEl.innerText = 'TERRAIN: RURAL VILLAGE & FARMLAND PERIMETER';
+      } else if (type === 'port') {
+        buildCoastalPort();
+        titleEl.innerText = 'TERRAIN: COASTAL INDUSTRIAL PORT ASSET';
+      }
+    }
+
+    // A. METROPOLIS CITY BUILDER
+    function buildMetropolisCity() {
+      // Ground Asphalt
+      const gMat = new THREE.MeshStandardMaterial({ color: 0x1E242B, roughness: 0.8 });
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), gMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      environmentGroup.add(ground);
+
+      // Roads
+      const rMat = new THREE.MeshStandardMaterial({ color: 0x2B323B, roughness: 0.5 });
+      const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(32, 600), rMat);
+      roadNS.rotation.x = -Math.PI / 2;
+      roadNS.position.y = 0.1;
+      environmentGroup.add(roadNS);
+
+      const roadEW = new THREE.Mesh(new THREE.PlaneGeometry(600, 32), rMat);
+      roadEW.rotation.x = -Math.PI / 2;
+      roadEW.position.y = 0.11;
+      environmentGroup.add(roadEW);
+
+      // Buildings Matrix (Tall commercial, mid-rise, industrial)
+      const bldgDefs = [
+        { x: -75, z: -75, w: 60, d: 60, h: 70, c: 0x334155 },
+        { x: -145, z: -75, w: 50, d: 65, h: 52, c: 0x3F4E63 },
+        { x: -75, z: -145, w: 55, d: 55, h: 85, c: 0x2A3545 },
+        { x: 75, z: -75, w: 65, d: 60, h: 65, c: 0x3B485A },
+        { x: 145, z: -75, w: 55, d: 60, h: 48, c: 0x47566A },
+        { x: 75, z: -145, w: 60, d: 65, h: 95, c: 0x2C3848 },
+        { x: -75, z: 75, w: 55, d: 65, h: 45, c: 0x364354 },
+        { x: 75, z: 75, w: 60, d: 60, h: 58, c: 0x3A4758 }
+      ];
+
+      bldgDefs.forEach(b => {
+        const bMesh = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), new THREE.MeshStandardMaterial({ color: b.c, roughness: 0.7 }));
+        bMesh.position.set(b.x, b.h / 2, b.z);
+        bMesh.castShadow = true;
+        bMesh.receiveShadow = true;
+        environmentGroup.add(bMesh);
+
+        // Rooftop HVAC & Antenna
+        const hvac = new THREE.Mesh(new THREE.BoxGeometry(b.w * 0.3, 3, b.d * 0.3), new THREE.MeshStandardMaterial({ color: 0x1E293B }));
+        hvac.position.set(b.x - b.w * 0.2, b.h + 1.5, b.z);
+        environmentGroup.add(hvac);
+
+        const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 12, 6), new THREE.MeshStandardMaterial({ color: 0x64748B }));
+        ant.position.set(b.x + b.w * 0.3, b.h + 6, b.z);
+        environmentGroup.add(ant);
+
+        // Windows
+        const winMat = new THREE.MeshBasicMaterial({ color: 0xFFEAA7 });
+        for (let r = 1; r < Math.floor(b.h / 7); r++) {
+          for (let c = -1; c <= 1; c++) {
+            if ((r + c) % 2 === 0) {
+              const win = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 2.5), winMat);
+              win.position.set(b.x + c * (b.w * 0.28), r * 7, b.z + b.d / 2 + 0.1);
+              environmentGroup.add(win);
+            }
+          }
+        }
+      });
+
+      // City Trees along avenues
+      addTreesCluster([
+        { x: 22, z: 35 }, { x: 22, z: 65 }, { x: -22, z: 35 }, { x: -22, z: 65 },
+        { x: 35, z: 22 }, { x: 65, z: 22 }, { x: -35, z: -22 }
+      ]);
+    }
+
+    // B. MOUNTAIN VALLEY BUILDER (Mountains, ridges, watchtower)
+    function buildMountainValley() {
+      // Mountainous rugged Terrain Base (displaced height geometry)
+      const terrainGeo = new THREE.PlaneGeometry(1200, 1200, 32, 32);
+      const pos = terrainGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i);
+        const vy = pos.getY(i);
+        // Procedural mountain ridges around edges and valley center
+        const distFromCenter = Math.sqrt(vx * vx + vy * vy);
+        if (distFromCenter > 90) {
+          const mountainH = Math.sin(vx * 0.02) * Math.cos(vy * 0.02) * 55 + (distFromCenter - 90) * 0.35;
+          pos.setZ(i, Math.max(0, mountainH));
+        }
+      }
+      terrainGeo.computeVertexNormals();
+
+      const mountainMat = new THREE.MeshStandardMaterial({
+        color: 0x4A5568, // Rocky slate
+        roughness: 0.95,
+        flatShading: true
+      });
+      const mountainMesh = new THREE.Mesh(terrainGeo, mountainMat);
+      mountainMesh.rotation.x = -Math.PI / 2;
+      mountainMesh.receiveShadow = true;
+      environmentGroup.add(mountainMesh);
+
+      // Valley Observation Watchtower Station (Center)
+      const towerBase = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, 18, 8), new THREE.MeshStandardMaterial({ color: 0x2D3748, roughness: 0.8 }));
+      towerBase.position.set(0, 9, 0);
+      towerBase.castShadow = true;
+      environmentGroup.add(towerBase);
+
+      const towerDeck = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 1.5, 8), new THREE.MeshStandardMaterial({ color: 0x1A202C }));
+      towerDeck.position.set(0, 18.5, 0);
+      environmentGroup.add(towerDeck);
+
+      // Searchlight on Watchtower
+      const lightPod = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFFBEB }));
+      lightPod.position.set(0, 20.2, 0);
+      environmentGroup.add(lightPod);
+
+      const spot = new THREE.SpotLight(0xFFFBEB, 2.5, 300, Math.PI / 6, 0.4);
+      spot.position.set(0, 20, 0);
+      spot.target.position.set(40, 0, -40);
+      environmentGroup.add(spot);
+      environmentGroup.add(spot.target);
+
+      // Alpine Pine Trees around valley
+      const pinePositions = [
+        { x: 30, z: 25 }, { x: 45, z: 35 }, { x: -35, z: 40 }, { x: -50, z: 20 },
+        { x: 50, z: -35 }, { x: -40, z: -40 }, { x: 70, z: -60 }, { x: -70, z: -60 }
+      ];
+      addPineTreesCluster(pinePositions);
+    }
+
+    // C. RURAL VILLAGE BUILDER (Cottages, barns, fences, orchards)
+    function buildRuralVillage() {
+      // Grass/Field Ground
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({ color: 0x2E4A28, roughness: 0.9 }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      environmentGroup.add(ground);
+
+      // Dirt Road
+      const dirtRoad = new THREE.Mesh(new THREE.PlaneGeometry(24, 600), new THREE.MeshStandardMaterial({ color: 0x8D6E63, roughness: 0.95 }));
+      dirtRoad.rotation.x = -Math.PI / 2;
+      dirtRoad.position.y = 0.1;
+      environmentGroup.add(dirtRoad);
+
+      // Village Houses with Pitched Roofs
+      const villageHouses = [
+        { x: -35, z: 40, w: 18, d: 24, h: 10, c: 0xD7CCC8, roofC: 0xA0522D },
+        { x: -40, z: 85, w: 20, d: 26, h: 11, c: 0xCFD8DC, roofC: 0x8B4513 },
+        { x: 35, z: 35, w: 22, d: 28, h: 12, c: 0xEFEBE9, roofC: 0xB22222 },
+        { x: 40, z: 90, w: 24, d: 32, h: 14, c: 0xD7CCC8, roofC: 0xA0522D }, // Barn
+        { x: -35, z: -40, w: 18, d: 22, h: 10, c: 0xCFD8DC, roofC: 0x8B4513 },
+        { x: 35, z: -45, w: 20, d: 24, h: 10, c: 0xEFEBE9, roofC: 0xB22222 }
+      ];
+
+      villageHouses.forEach(h => {
+        // Walls
+        const house = new THREE.Mesh(new THREE.BoxGeometry(h.w, h.h, h.d), new THREE.MeshStandardMaterial({ color: h.c, roughness: 0.8 }));
+        house.position.set(h.x, h.h / 2, h.z);
+        house.castShadow = true;
+        environmentGroup.add(house);
+
+        // Pitched Roof (Prism)
+        const roofGeo = new THREE.ConeGeometry(h.w * 0.85, 6, 4);
+        const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: h.roofC, roughness: 0.7 }));
+        roof.rotation.y = Math.PI / 4;
+        roof.position.set(h.x, h.h + 3, h.z);
+        roof.scale.set(1, 1, h.d / h.w);
+        roof.castShadow = true;
+        environmentGroup.add(roof);
+
+        // Chimney
+        const chim = new THREE.Mesh(new THREE.BoxGeometry(1.5, 5, 1.5), new THREE.MeshStandardMaterial({ color: 0x8D6E63 }));
+        chim.position.set(h.x + h.w * 0.25, h.h + 4.5, h.z);
+        environmentGroup.add(chim);
+      });
+
+      // Wooden perimeter fences
+      const fenceMat = new THREE.MeshStandardMaterial({ color: 0x6D4C41 });
+      for (let z = 20; z < 110; z += 12) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.5, 6), fenceMat);
+        post.position.set(-18, 1.25, z);
+        environmentGroup.add(post);
+
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 12), fenceMat);
+        rail.position.set(-18, 1.6, z + 6);
+        environmentGroup.add(rail);
+      }
+
+      // Orchard Trees
+      addTreesCluster([
+        { x: -70, z: 30 }, { x: -85, z: 50 }, { x: -75, z: 75 },
+        { x: 75, z: 30 }, { x: 90, z: 55 }, { x: 80, z: 80 }
+      ]);
+    }
+
+    // D. COASTAL PORT BUILDER (Water surface, docks, containers, cranes)
+    function buildCoastalPort() {
+      // Ocean Water Plane
+      const waterMat = new THREE.MeshStandardMaterial({ color: 0x0A2540, roughness: 0.1, metalness: 0.8 });
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(1200, 600), waterMat);
+      water.rotation.x = -Math.PI / 2;
+      water.position.set(0, 0, -300);
+      environmentGroup.add(water);
+
+      // Concrete Dock Pier Base
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(600, 4, 300), new THREE.MeshStandardMaterial({ color: 0x64748B, roughness: 0.85 }));
+      pier.position.set(0, 2, 150);
+      pier.receiveShadow = true;
+      environmentGroup.add(pier);
+
+      // Stacked Cargo Shipping Containers (Red, Blue, Green, Orange)
+      const colors = [0xB91C1C, 0x1D4ED8, 0x15803D, 0xC2410C];
+      for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 6; col++) {
+          const stackH = (row + col) % 3 + 1;
+          for (let s = 0; s < stackH; s++) {
+            const cMat = new THREE.MeshStandardMaterial({ color: colors[(row + col + s) % colors.length], roughness: 0.6 });
+            const cMesh = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 24), cMat);
+            cMesh.position.set(-120 + col * 14, 4 + s * 4 + 2, 60 + row * 28);
+            cMesh.castShadow = true;
+            environmentGroup.add(cMesh);
+          }
+        }
+      }
+
+      // Port Crane Gantry Tower
+      const craneMat = new THREE.MeshStandardMaterial({ color: 0xD97706, metalness: 0.6 });
+      const craneLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 45, 6), craneMat);
+      craneLegL.position.set(-60, 22.5, 8);
+      environmentGroup.add(craneLegL);
+
+      const craneLegR = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 45, 6), craneMat);
+      craneLegR.position.set(-20, 22.5, 8);
+      environmentGroup.add(craneLegR);
+
+      const craneBoom = new THREE.Mesh(new THREE.BoxGeometry(90, 4, 6), craneMat);
+      craneBoom.position.set(-40, 44, -10);
+      environmentGroup.add(craneBoom);
+    }
+
+    function addTreesCluster(positions) {
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4E3629 });
+      const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2D5A27, roughness: 0.8 });
+
+      positions.forEach(p => {
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 6, 8), trunkMat);
+        trunk.position.y = 3;
+        trunk.castShadow = true;
+        tree.add(trunk);
+
+        const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(3.5, 1), foliageMat);
+        crown.position.y = 6.5;
+        crown.castShadow = true;
+        tree.add(crown);
+
+        tree.position.set(p.x, 0, p.y || p.z);
+        environmentGroup.add(tree);
+      });
+    }
+
+    function addPineTreesCluster(positions) {
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3E2723 });
+      const pineMat = new THREE.MeshStandardMaterial({ color: 0x1B4332, roughness: 0.9 });
+
+      positions.forEach(p => {
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 5, 6), trunkMat);
+        trunk.position.y = 2.5;
+        tree.add(trunk);
+
+        for (let i = 0; i < 3; i++) {
+          const cone = new THREE.Mesh(new THREE.ConeGeometry(3 - i * 0.7, 4.5, 7), pineMat);
+          cone.position.y = 5 + i * 2.8;
+          cone.castShadow = true;
+          tree.add(cone);
+        }
+
+        tree.position.set(p.x, 0, p.z);
+        environmentGroup.add(tree);
+      });
+    }
+
+    // ==========================================
+    // 2. CUSTOMIZABLE 3D DRONE MODEL BUILDER
+    // ==========================================
+    function rebuildDroneModel() {
+      if (droneGroup) {
+        scene.remove(droneGroup);
+        droneRotors = [];
+      }
+
+      droneGroup = new THREE.Group();
+      const carbonMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, metalness: 0.5, roughness: 0.25 });
+      const motorMat  = new THREE.MeshStandardMaterial({ color: 0x475467, metalness: 0.85, roughness: 0.2 });
+      const rotorMat  = new THREE.MeshStandardMaterial({ color: 0x60A5FA, transparent: true, opacity: 0.65 });
+
+      if (state.droneType === 'quadcopter') {
+        // Commercial Quadcopter (DJI Phantom style)
+        // Fuselage
+        const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 3.2), carbonMat);
+        body.castShadow = true;
+        droneGroup.add(body);
+
+        // Top Battery Hood
+        const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 0.6, 12), motorMat);
+        hood.position.y = 0.65;
+        droneGroup.add(hood);
+
+        // 4 Carbon Arms in X-Formation
+        const arms = [
+          { x: 1.8, z: 1.8 }, { x: -1.8, z: 1.8 },
+          { x: 1.8, z: -1.8 }, { x: -1.8, z: -1.8 }
+        ];
+
+        arms.forEach(a => {
+          const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.2, 8), carbonMat);
+          arm.rotation.z = Math.PI / 2;
+          arm.rotation.y = Math.atan2(a.z, a.x);
+          arm.position.set(a.x * 0.5, 0, a.z * 0.5);
+          droneGroup.add(arm);
+
+          // Motor
+          const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.6, 10), motorMat);
+          motor.position.set(a.x, 0.3, a.z);
+          droneGroup.add(motor);
+
+          // Rotor disc
+          const rotor = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.04, 16), rotorMat);
+          rotor.position.set(a.x, 0.65, a.z);
+          droneGroup.add(rotor);
+          droneRotors.push(rotor);
+        });
+
+        // Landing Gear Skids
+        const skidMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 });
+        const skidL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.6, 6), skidMat);
+        skidL.rotation.x = Math.PI / 2;
+        skidL.position.set(-1.4, -1.0, 0);
+        droneGroup.add(skidL);
+
+        const skidR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.6, 6), skidMat);
+        skidR.rotation.x = Math.PI / 2;
+        skidR.position.set(1.4, -1.0, 0);
+        droneGroup.add(skidR);
+
+      } else if (state.droneType === 'fixedwing') {
+        // Fixed-Wing Reconnaissance UAV
+        // Fuselage
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.5, 6.5, 12), carbonMat);
+        body.rotation.x = Math.PI / 2;
+        droneGroup.add(body);
+
+        // Swept Wings (Span 12m)
+        const wingGeo = new THREE.BoxGeometry(11, 0.15, 1.8);
+        const wings = new THREE.Mesh(wingGeo, carbonMat);
+        wings.position.set(0, 0.2, 0.2);
+        droneGroup.add(wings);
+
+        // V-Tail Fins
+        const tailL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 1.2), carbonMat);
+        tailL.rotation.z = Math.PI / 6;
+        tailL.position.set(-1.1, 1.0, -2.8);
+        droneGroup.add(tailL);
+
+        const tailR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 1.2), carbonMat);
+        tailR.rotation.z = -Math.PI / 6;
+        tailR.position.set(1.1, 1.0, -2.8);
+        droneGroup.add(tailR);
+
+        // Rear Pusher Propeller
+        const prop = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.04, 12), rotorMat);
+        prop.rotation.x = Math.PI / 2;
+        prop.position.set(0, 0, -3.4);
+        droneGroup.add(prop);
+        droneRotors.push(prop);
+
+      } else if (state.droneType === 'hexacopter') {
+        // Heavy Hexacopter (6-Rotor)
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.8, 6), carbonMat);
+        droneGroup.add(body);
+
+        for (let i = 0; i < 6; i++) {
+          const ang = (i * Math.PI) / 3;
+          const hx = Math.cos(ang) * 2.8;
+          const hz = Math.sin(ang) * 2.8;
+
+          const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.8, 8), carbonMat);
+          arm.rotation.z = Math.PI / 2;
+          arm.rotation.y = -ang;
+          arm.position.set(hx * 0.5, 0, hz * 0.5);
+          droneGroup.add(arm);
+
+          const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 10), motorMat);
+          motor.position.set(hx, 0.3, hz);
+          droneGroup.add(motor);
+
+          const rotor = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.04, 16), rotorMat);
+          rotor.position.set(hx, 0.65, hz);
+          droneGroup.add(rotor);
+          droneRotors.push(rotor);
+        }
+
+      } else if (state.droneType === 'fpv') {
+        // Micro-FPV Racing Drone (Compact X-Frame)
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 1.5), new THREE.MeshStandardMaterial({ color: 0xEF4444 }));
+        droneGroup.add(body);
+
+        const arms = [{ x: 1, z: 1 }, { x: -1, z: 1 }, { x: 1, z: -1 }, { x: -1, z: -1 }];
+        arms.forEach(a => {
+          const rotor = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.03, 12), rotorMat);
+          rotor.position.set(a.x * 1.2, 0.2, a.z * 1.2);
+          droneGroup.add(rotor);
+          droneRotors.push(rotor);
+        });
+      }
+
+      // Add Payload
+      if (state.payloadType === 'camera') {
+        const camPod = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 12), new THREE.MeshStandardMaterial({ color: 0x0F172A, roughness: 0.1 }));
+        camPod.position.set(0, -0.65, 0.8);
+        droneGroup.add(camPod);
+      } else if (state.payloadType === 'cargo') {
+        const cargoBox = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.6), new THREE.MeshStandardMaterial({ color: 0xD97706, roughness: 0.5 }));
+        cargoBox.position.set(0, -1.0, 0);
+        droneGroup.add(cargoBox);
+      } else if (state.payloadType === 'jammer') {
+        const jammer = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x9333EA }));
+        jammer.position.set(0, -1.1, 0);
+        droneGroup.add(jammer);
+      }
+
+      // Add Strobe Lights
+      droneStrobeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+      droneStrobeMesh.position.set(0, 0.7, 0);
+      droneGroup.add(droneStrobeMesh);
+
+      // Initial Spawn at selected Distance & Altitude
+      updateDronePositionInSpace();
+      scene.add(droneGroup);
+    }
+
+    function updateDronePositionInSpace() {
+      if (!droneGroup) return;
+      // Position drone at azimuth ~034 deg relative to observer camera (0, 14, 80)
+      const rad = 0.59; // ~34 degrees
+      const cx = 0;
+      const cz = 80;
+      const targetX = cx + Math.sin(rad) * state.droneDist;
+      const targetZ = cz - Math.cos(rad) * state.droneDist;
+      droneGroup.position.set(targetX, state.droneAlt, targetZ);
+    }
+
+    // 1-Click: Focus and snap camera directly onto Drone!
+    function focusDroneCamera() {
+      if (!droneGroup) return;
+      // Position camera right behind & looking directly at drone
+      camera.position.set(droneGroup.position.x - 12, droneGroup.position.y + 4, droneGroup.position.z + 18);
+      if (controls) {
+        controls.target.copy(droneGroup.position);
+        controls.update();
+      }
+      camera.lookAt(droneGroup.position);
+      document.getElementById('camTitleText').innerText = `CAMERA FOCUS: DIRECT INSPECTION (${state.droneType.toUpperCase()})`;
+    }
+
+    function setDroneDistance(dist) {
+      state.droneDist = dist;
+      ['Close', 'Med', 'Far'].forEach(k => {
+        const btn = document.getElementById(`distBtn${k}`);
+        if (btn) btn.className = 'px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:bg-slate-100 border border-[#D0D5DD]';
+      });
+
+      if (dist <= 50) {
+        document.getElementById('distBtnClose').className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300';
+      } else if (dist <= 150) {
+        document.getElementById('distBtnMed').className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300';
+      } else {
+        document.getElementById('distBtnFar').className = 'px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300';
+      }
+
+      updateDronePositionInSpace();
+    }
+
+    // Modal Drawer Toggles & Settings
+    function toggleDroneCustomizer() {
+      const modal = document.getElementById('droneCustomizerModal');
+      if (modal) modal.classList.toggle('hidden');
+    }
+
+    function setDroneModelType(type) {
+      state.droneType = type;
+      ['Quad', 'Fixed', 'Hexa', 'Fpv'].forEach(m => {
+        const btn = document.getElementById(`mdlBtn${m}`);
+        if (btn) btn.className = 'p-2.5 rounded-lg border border-[#D0D5DD] bg-white text-slate-800 font-medium text-left hover:bg-slate-50';
+      });
+      const activeBtn = document.getElementById(`mdlBtn${type === 'quadcopter' ? 'Quad' : (type === 'fixedwing' ? 'Fixed' : (type === 'hexacopter' ? 'Hexa' : 'Fpv'))}`);
+      if (activeBtn) activeBtn.className = 'p-2.5 rounded-lg border-2 border-blue-600 bg-blue-50 text-blue-900 font-bold text-left';
+
+      document.getElementById('telemetryModel').innerText = `MODEL: ${type.toUpperCase()}`;
+      rebuildDroneModel();
+    }
+
+    function updateCustomizerDistance(val) {
+      state.droneDist = parseInt(val);
+      document.getElementById('custDistLabel').innerText = `${val} m`;
+      updateDronePositionInSpace();
+    }
+
+    function updateCustomizerAltitude(val) {
+      state.droneAlt = parseInt(val);
+      document.getElementById('custAltLabel').innerText = `${val} m`;
+      updateDronePositionInSpace();
+    }
+
+    function updateCustomizerPayload(val) {
+      state.payloadType = val;
+      rebuildDroneModel();
+    }
+
+    function updateCustomizerLighting(val) {
+      state.lightingType = val;
+      if (droneStrobeMesh) {
+        if (val === 'strobe') droneStrobeMesh.material.color.setHex(0xFFFFFF);
+        else if (val === 'military') droneStrobeMesh.material.color.setHex(0x22C55E);
+        else if (val === 'amber') droneStrobeMesh.material.color.setHex(0xF59E0B);
+        else if (val === 'stealth') droneStrobeMesh.visible = false;
+      }
+    }
+
+    function setFlightPattern(pat) {
+      state.flightPattern = pat;
+      ['Hover', 'Fig8', 'Incur'].forEach(p => {
+        const btn = document.getElementById(`patBtn${p}`);
+        if (btn) btn.className = 'p-2 rounded border border-[#D0D5DD] hover:bg-slate-50 font-medium text-slate-800 text-center';
+      });
+      const act = document.getElementById(`patBtn${pat === 'hover' ? 'Hover' : (pat === 'figure8' ? 'Fig8' : 'Incur')}`);
+      if (act) act.className = 'p-2 rounded border-2 border-blue-600 bg-blue-50 font-bold text-blue-900 text-center';
+    }
+
+    // ==========================================
+    // 3. ANIMATED NON-THREAT BIRDS & WEATHER
+    // ==========================================
+    function buildBiologicalBirds() {
+      birdGroup = new THREE.Group();
+      const birdMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+
+      const body = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.8, 6), birdMat);
+      body.rotation.x = Math.PI / 2;
+      birdGroup.add(body);
+
+      const wingL = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.6), birdMat);
+      wingL.position.set(-1.0, 0.1, 0);
+      birdGroup.add(wingL);
+
+      const wingR = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.6), birdMat);
+      wingR.position.set(1.0, 0.1, 0);
+      birdGroup.add(wingR);
+
+      birdWings = [wingL, wingR];
+      birdGroup.position.set(-35, 22, 20);
+      scene.add(birdGroup);
+    }
+
+    function buildRainSystem() {
+      const rainCount = 3500;
+      rainGeo = new THREE.BufferGeometry();
+      const rainPositions = new Float32Array(rainCount * 3);
+
+      for (let i = 0; i < rainCount * 3; i += 3) {
+        rainPositions[i] = (Math.random() - 0.5) * 400;
+        rainPositions[i + 1] = Math.random() * 200;
+        rainPositions[i + 2] = (Math.random() - 0.5) * 400;
+      }
+
+      rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+      const rainMat = new THREE.PointsMaterial({ color: 0x93C5FD, size: 0.6, transparent: true, opacity: 0.65 });
+      rainParticles = new THREE.Points(rainGeo, rainMat);
+      rainParticles.visible = false;
+      scene.add(rainParticles);
+    }
+
+    function setSimulationEnv(mode) {
+      state.simEnv = mode;
+      ['day', 'night', 'fog', 'rain'].forEach(m => {
+        const b = document.getElementById(`envBtn${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        if (b) b.className = 'px-2 py-1 rounded text-[11px] font-medium transition text-[#475467] hover:text-[#17202A]';
+      });
+
+      const activeB = document.getElementById(`envBtn${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
+      if (activeB) activeB.className = 'px-2 py-1 rounded text-[11px] font-semibold transition bg-white shadow-xs text-blue-700';
+
+      if (rainParticles) rainParticles.visible = (mode === 'rain');
+
+      if (mode === 'day') {
+        scene.background = new THREE.Color(0x8EAEC9);
+        scene.fog.color.setHex(0x8EAEC9);
+        scene.fog.density = 0.001;
+        renderer.toneMappingExposure = 1.3;
+        dirSunLight.intensity = 1.7;
+        dirSunLight.color.setHex(0xFFF9E6);
+        hemiLight.intensity = 0.85;
+      } else if (mode === 'night') {
+        scene.background = new THREE.Color(0x0C121E);
+        scene.fog.color.setHex(0x0C121E);
+        scene.fog.density = 0.0022;
+        renderer.toneMappingExposure = 1.0;
+        dirSunLight.intensity = 0.35;
+        dirSunLight.color.setHex(0x6080AA);
+        hemiLight.intensity = 0.4;
+      } else if (mode === 'fog') {
+        scene.background = new THREE.Color(0x768291);
+        scene.fog.color.setHex(0x768291);
+        scene.fog.density = 0.012;
+        renderer.toneMappingExposure = 0.9;
+        dirSunLight.intensity = 0.45;
+        hemiLight.intensity = 0.55;
+      } else if (mode === 'rain') {
+        scene.background = new THREE.Color(0x1B232E);
+        scene.fog.color.setHex(0x1B232E);
+        scene.fog.density = 0.004;
+        renderer.toneMappingExposure = 0.88;
+        dirSunLight.intensity = 0.35;
+        hemiLight.intensity = 0.45;
+      }
+    }
+
+    // ==========================================
+    // 4. ANIMATION & RENDER LOOP
+    // ==========================================
+    function animateThree() {
+      requestAnimationFrame(animateThree);
+
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+
+      // Spin Drone Propellers
+      droneRotors.forEach(r => {
+        r.rotation.y += 32 * delta;
+      });
+
+      // Blink Drone Strobe
+      if (droneStrobeMesh && state.lightingType !== 'stealth') {
+        droneStrobeMesh.visible = Math.sin(time * 8) > 0.3;
+      }
+
+      // Dynamic Flight Movement Based on Pattern
+      if (droneGroup) {
+        let offsetX = 0;
+        let offsetZ = 0;
+
+        if (state.flightPattern === 'hover') {
+          offsetX = Math.sin(time * 0.8) * 3;
+          offsetZ = Math.cos(time * 0.6) * 3;
+        } else if (state.flightPattern === 'figure8') {
+          offsetX = Math.sin(time * 0.6) * 22;
+          offsetZ = Math.sin(time * 1.2) * 12;
+        } else if (state.flightPattern === 'incursion') {
+          offsetX = Math.sin(time * 0.5) * 8;
+          offsetZ = (Math.sin(time * 0.4) * 25) - 10;
+        }
+
+        const rad = 0.59;
+        const baseX = Math.sin(rad) * state.droneDist;
+        const baseZ = 80 - Math.cos(rad) * state.droneDist;
+
+        droneGroup.position.x = baseX + offsetX;
+        droneGroup.position.z = baseZ + offsetZ;
+        droneGroup.position.y = state.droneAlt + Math.sin(time * 1.2) * 0.8;
+
+        droneGroup.rotation.z = Math.sin(time * 1.2) * 0.08;
+      }
+
+      // Animated Birds
+      if (birdGroup) {
+        birdGroup.position.x = -45 + Math.sin(time * 0.6) * 30;
+        birdGroup.position.z = 20 + Math.cos(time * 0.5) * 25;
+        const flap = Math.sin(time * 14) * 0.4;
+        if (birdWings[0]) birdWings[0].rotation.z = flap;
+        if (birdWings[1]) birdWings[1].rotation.z = -flap;
+      }
+
+      // Falling Rain
+      if (rainParticles && rainParticles.visible && rainGeo) {
+        const arr = rainGeo.attributes.position.array;
+        for (let i = 1; i < arr.length; i += 3) {
+          arr[i] -= 180 * delta;
+          if (arr[i] < 0) arr[i] = 180;
+        }
+        rainGeo.attributes.position.needsUpdate = true;
+      }
+
+      // Camera Mode tracking
+      if (state.cameraMode === 'tracking' && droneGroup) {
+        camera.lookAt(droneGroup.position);
+      } else if (controls && state.cameraMode === 'observer') {
+        controls.update();
+      }
+
+      // Position On-Screen Target Reticle Box
+      if (droneGroup && camera) {
+        const v = droneGroup.position.clone();
+        v.project(camera);
+
+        const container = document.getElementById('threeCanvasWrapper');
+        if (container) {
+          const sx = (v.x * 0.5 + 0.5) * container.clientWidth;
+          const sy = (-(v.y * 0.5) + 0.5) * container.clientHeight;
+
+          const ret = document.getElementById('hudReticle');
+          if (ret) {
+            if (v.z < 1) {
+              ret.style.left = `${sx}px`;
+              ret.style.top = `${sy}px`;
+              ret.classList.remove('hidden');
+            } else {
+              ret.classList.add('hidden');
+            }
+          }
+
+          const distM = Math.round(camera.position.distanceTo(droneGroup.position));
+          document.getElementById('telemetryRange').innerText = `RNG: ${distM}m (CLEAR VISUAL)`;
+          document.getElementById('detailDistance').innerText = `${distM} m (Visual Lock)`;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('threeCanvasWrapper');
+      if (!container || !renderer || !camera) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+    window.addEventListener('resize', onWindowResize);
+
+    // ==========================================
+    // 5. APP VIEW NAVIGATION & TELEMETRY
+    // ==========================================
+    const viewList = ['simulation', 'overview', 'scenarios', 'trainees', 'aar', 'analytics', 'studio', 'settings', 'landing'];
+
+    function switchView(viewName) {
+      state.currentView = viewName;
+      viewList.forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        if (el) {
+          if (v === viewName) el.classList.remove('hidden');
+          else el.classList.add('hidden');
+        }
+      });
+      if (viewName === 'simulation') setTimeout(onWindowResize, 50);
+    }
+
+    function setCameraMode(mode) {
+      state.cameraMode = mode;
+      ['observer', 'tracking', 'orbit'].forEach(m => {
+        const b = document.getElementById(`camBtn${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        if (b) {
+          if (m === mode) b.className = 'px-2 py-0.5 rounded text-[11px] font-semibold bg-white shadow-xs text-blue-700';
+          else b.className = 'px-2 py-0.5 rounded text-[11px] font-medium text-[#475467] hover:text-[#17202A]';
+        }
+      });
+    }
+
+    function adjustZoom(delta) {
+      state.zoomFactor = Math.max(1.0, Math.min(8.0, state.zoomFactor + delta));
+      document.getElementById('zoomLevelDisplay').innerText = `${state.zoomFactor.toFixed(1)}x`;
+      if (camera) {
+        camera.fov = 55 / state.zoomFactor;
+        camera.updateProjectionMatrix();
+        document.getElementById('telemetryFOV').innerText = `FOV: ${(55 / state.zoomFactor).toFixed(1)}°`;
+      }
+    }
+
+    function selectTrack(id) {
+      state.selectedTrackId = id;
+      if (id === 3) focusDroneCamera();
+    }
+
+    function handleClassify(c) {
+      state.userClassification = c;
+      ['DRONE', 'NON-THREAT', 'UNKNOWN'].forEach(cls => {
+        const b = document.getElementById(`btnClassify${cls === 'NON-THREAT' ? 'NonThreat' : (cls === 'DRONE' ? 'Drone' : 'Unknown')}`);
+        if (cls === c) b.className = 'px-3 py-1 font-bold rounded transition bg-white shadow-xs text-blue-700';
+        else b.className = 'px-3 py-1 font-semibold rounded transition text-[#344054] hover:bg-white';
+      });
+    }
+
+    function handleResponse(r) {
+      state.userResponse = r;
+      ['MONITOR', 'VERIFY', 'ALERT'].forEach(resp => {
+        const b = document.getElementById(`btnResp${resp === 'MONITOR' ? 'Monitor' : (resp === 'VERIFY' ? 'Verify' : 'Alert')}`);
+        if (resp === r) {
+          if (r === 'ALERT') b.className = 'px-3 py-1 font-bold rounded transition bg-red-700 text-white shadow-xs';
+          else b.className = 'px-3 py-1 font-bold rounded transition bg-white shadow-xs text-blue-700';
+        } else {
+          b.className = 'px-3 py-1 font-semibold rounded transition text-[#344054] hover:bg-white';
+        }
+      });
+    }
+
+    function submitTraineeDecision() {
+      const fb = document.getElementById('decisionFeedback');
+      fb.className = 'text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-300';
+      fb.innerText = `Decision Recorded: [${state.userClassification}] -> [${state.userResponse}]`;
+      setTimeout(() => {
+        fb.className = 'text-xs font-medium text-slate-600 bg-[#F8F9FA] px-2.5 py-1 rounded border border-[#E4E7EC]';
+        fb.innerText = 'Evaluation logged to After-Action Review file';
+      }, 3500);
+    }
+
+    // Session Clock
+    setInterval(() => {
+      state.sessionSeconds++;
+      const m = Math.floor(state.sessionSeconds / 60);
+      const s = state.sessionSeconds % 60;
+      const fmt = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      const timerEl = document.getElementById('sessionTimer');
+      if (timerEl) timerEl.innerText = `00:${fmt}`;
+    }, 1000);
+
+    window.addEventListener('load', () => {
+      initThreeEngine();
+    });
+  </script>
+</body>
+</html>
