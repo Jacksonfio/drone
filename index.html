@@ -964,6 +964,10 @@
     let dirSunLight, hemiLight;
     let rainParticles, rainGeo;
     let streetPointLights = [];
+    let windmillBlades = null;
+    let lighthouseBeam = null;
+    let buoyGroupList = [];
+    let coastalWaterMesh = null;
     let clock = new THREE.Clock();
 
     function initThreeEngine() {
@@ -1032,6 +1036,10 @@
     // ==========================================
     function clearCurrentTerrain() {
       streetPointLights = [];
+      windmillBlades = null;
+      lighthouseBeam = null;
+      buoyGroupList = [];
+      coastalWaterMesh = null;
       while (environmentGroup.children.length > 0) {
         const obj = environmentGroup.children[0];
         environmentGroup.remove(obj);
@@ -1195,55 +1203,417 @@
       addPineTreesCluster(pinePositions);
     }
 
-    // C. RURAL VILLAGE BUILDER (Cottages, barns, fences, orchards)
+    // C. RURAL VILLAGE & EXTENSIVE CROPLANDS BUILDER
     function buildRuralVillage() {
-      // Grass/Field Ground
-      const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({ color: 0x2E4A28, roughness: 0.9 }));
+      // 1. Agrarian Terrain Base Ground
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshStandardMaterial({ color: 0x2A4520, roughness: 0.9 }));
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = true;
       environmentGroup.add(ground);
 
-      // Dirt Road
-      const dirtRoad = new THREE.Mesh(new THREE.PlaneGeometry(24, 600), new THREE.MeshStandardMaterial({ color: 0x8D6E63, roughness: 0.95 }));
-      dirtRoad.rotation.x = -Math.PI / 2;
-      dirtRoad.position.y = 0.1;
-      environmentGroup.add(dirtRoad);
+      // 2. Intersecting Country Dirt & Gravel Roads
+      const dirtMat = new THREE.MeshStandardMaterial({ color: 0x7A5B43, roughness: 0.95 });
+      const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(28, 700), dirtMat);
+      roadNS.rotation.x = -Math.PI / 2;
+      roadNS.position.set(0, 0.08, 0);
+      roadNS.receiveShadow = true;
+      environmentGroup.add(roadNS);
 
-      // Village Houses with Pitched Roofs
+      const roadEW = new THREE.Mesh(new THREE.PlaneGeometry(550, 20), dirtMat);
+      roadEW.rotation.x = -Math.PI / 2;
+      roadEW.position.set(20, 0.09, -30);
+      roadEW.receiveShadow = true;
+      environmentGroup.add(roadEW);
+
+      // Cart Ruts (darker worn tracks)
+      const rutMat = new THREE.MeshStandardMaterial({ color: 0x553C2A, roughness: 1.0 });
+      [-4.5, 4.5].forEach(rx => {
+        const rut = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 700), rutMat);
+        rut.rotation.x = -Math.PI / 2;
+        rut.position.set(rx, 0.1, 0);
+        environmentGroup.add(rut);
+      });
+
+      // 3. AGRICULTURAL CROPLAND PLOTS (5 Distinct 3D Crop Types)
+      // Plot A: Golden Ripe Wheat Field with Furrow Ridges & Rolled Hay Bales
+      const wheatBase = new THREE.Mesh(new THREE.PlaneGeometry(170, 260), new THREE.MeshStandardMaterial({ color: 0xC49533, roughness: 0.9 }));
+      wheatBase.rotation.x = -Math.PI / 2;
+      wheatBase.position.set(-135, 0.12, -20);
+      wheatBase.receiveShadow = true;
+      environmentGroup.add(wheatBase);
+
+      const wheatRowMat1 = new THREE.MeshStandardMaterial({ color: 0xD4AF37, roughness: 0.85 });
+      const wheatRowMat2 = new THREE.MeshStandardMaterial({ color: 0xB8860B, roughness: 0.85 });
+      for (let i = 0; i < 22; i++) {
+        const wx = -210 + i * 7.2;
+        const wMat = (i % 2 === 0) ? wheatRowMat1 : wheatRowMat2;
+        const furrow = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.2, 250), wMat);
+        furrow.position.set(wx, 0.6, -20);
+        furrow.receiveShadow = true;
+        environmentGroup.add(furrow);
+      }
+
+      // Rolled Golden Hay Bales (scattered in harvested section)
+      const hayMat = new THREE.MeshStandardMaterial({ color: 0xE5B842, roughness: 0.9 });
+      const hayStrapMat = new THREE.MeshStandardMaterial({ color: 0x4A3525 });
+      const hayBaleLocs = [
+        { x: -75, z: 40, r: 0.3 }, { x: -85, z: 65, r: 1.2 }, { x: -68, z: 85, r: -0.4 },
+        { x: -95, z: 95, r: 0.8 }, { x: -72, z: 110, r: 2.1 }, { x: -88, z: 20, r: -1.1 },
+        { x: -105, z: 45, r: 0.1 }, { x: -65, z: -10, r: 1.5 }
+      ];
+      hayBaleLocs.forEach(b => {
+        const bale = new THREE.Group();
+        const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 2.8, 14), hayMat);
+        cylinder.rotation.z = Math.PI / 2;
+        cylinder.position.y = 1.5;
+        cylinder.castShadow = true;
+        bale.add(cylinder);
+
+        // Binding straps
+        [-0.8, 0.8].forEach(sx => {
+          const strap = new THREE.Mesh(new THREE.CylinderGeometry(1.52, 1.52, 0.12, 14), hayStrapMat);
+          strap.rotation.z = Math.PI / 2;
+          strap.position.set(sx, 1.5, 0);
+          bale.add(strap);
+        });
+
+        bale.position.set(b.x, 0, b.z);
+        bale.rotation.y = b.r;
+        environmentGroup.add(bale);
+      });
+
+      // Plot B: Lush Green Vineyard / Maize Plantation with Trellis End-Posts
+      const vineBase = new THREE.Mesh(new THREE.PlaneGeometry(160, 240), new THREE.MeshStandardMaterial({ color: 0x1E3316, roughness: 0.9 }));
+      vineBase.rotation.x = -Math.PI / 2;
+      vineBase.position.set(135, 0.12, 15);
+      vineBase.receiveShadow = true;
+      environmentGroup.add(vineBase);
+
+      const vineMat = new THREE.MeshStandardMaterial({ color: 0x1B4D20, roughness: 0.8 });
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.9 });
+      for (let i = 0; i < 15; i++) {
+        const vx = 65 + i * 10;
+        const hedge = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.4, 220), vineMat);
+        hedge.position.set(vx, 1.2, 15);
+        hedge.castShadow = true;
+        environmentGroup.add(hedge);
+
+        // Trellis posts at ends
+        [-95, 95].forEach(pz => {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 3.2, 6), postMat);
+          post.position.set(vx, 1.6, 15 + pz);
+          post.castShadow = true;
+          environmentGroup.add(post);
+        });
+      }
+
+      // Plot C: Blooming Purple Lavender Field
+      const lavBase = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshStandardMaterial({ color: 0x3D2347, roughness: 0.9 }));
+      lavBase.rotation.x = -Math.PI / 2;
+      lavBase.position.set(-130, 0.12, 180);
+      environmentGroup.add(lavBase);
+
+      const lavMat1 = new THREE.MeshStandardMaterial({ color: 0x8A4F9E, roughness: 0.8 });
+      const lavMat2 = new THREE.MeshStandardMaterial({ color: 0x9C64B5, roughness: 0.8 });
+      for (let i = 0; i < 13; i++) {
+        const lx = -190 + i * 10;
+        const row = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.6, 125), (i % 2 === 0) ? lavMat1 : lavMat2);
+        row.position.set(lx, 0.8, 180);
+        environmentGroup.add(row);
+      }
+
+      // Plot D: Brilliant Canola / Mustard Yellow Blossom Field
+      const canolaBase = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), new THREE.MeshStandardMaterial({ color: 0xB7950B, roughness: 0.9 }));
+      canolaBase.rotation.x = -Math.PI / 2;
+      canolaBase.position.set(135, 0.12, -165);
+      environmentGroup.add(canolaBase);
+
+      const canolaMat = new THREE.MeshStandardMaterial({ color: 0xF1C40F, roughness: 0.8 });
+      for (let i = 0; i < 14; i++) {
+        const cx = 70 + i * 10;
+        const row = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.4, 135), canolaMat);
+        row.position.set(cx, 0.7, -165);
+        environmentGroup.add(row);
+      }
+
+      // Plot E: Fresh Tilled Dark Loam Earth Furrows
+      const loamBase = new THREE.Mesh(new THREE.PlaneGeometry(120, 130), new THREE.MeshStandardMaterial({ color: 0x3E2723, roughness: 0.95 }));
+      loamBase.rotation.x = -Math.PI / 2;
+      loamBase.position.set(100, 0.12, 175);
+      environmentGroup.add(loamBase);
+
+      const loamMat = new THREE.MeshStandardMaterial({ color: 0x4E342E, roughness: 0.95 });
+      for (let i = 0; i < 12; i++) {
+        const fx = 50 + i * 9;
+        const furrow = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.0, 115), loamMat);
+        furrow.position.set(fx, 0.5, 175);
+        environmentGroup.add(furrow);
+      }
+
+      // Plot F: Irrigation Water Canal with Stone Bridge Culvert
+      const canalWater = new THREE.Mesh(new THREE.PlaneGeometry(9, 290), new THREE.MeshStandardMaterial({ color: 0x1E5370, roughness: 0.2, metalness: 0.5 }));
+      canalWater.rotation.x = -Math.PI / 2;
+      canalWater.position.set(-45, 0.05, 50);
+      environmentGroup.add(canalWater);
+
+      // Stone Culvert
+      const culvert = new THREE.Mesh(new THREE.BoxGeometry(16, 2, 22), new THREE.MeshStandardMaterial({ color: 0x78716C, roughness: 0.9 }));
+      culvert.position.set(-45, 1, -30);
+      environmentGroup.add(culvert);
+
+      // 4. TRADITIONAL WORKING WINDMILL (Detailed & Animated)
+      const knoll = new THREE.Mesh(new THREE.CylinderGeometry(20, 24, 4, 16), new THREE.MeshStandardMaterial({ color: 0x2A4520, roughness: 0.9 }));
+      knoll.position.set(90, 2, -90);
+      environmentGroup.add(knoll);
+
+      // Masonry Tower
+      const millTower = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 7.8, 28, 10), new THREE.MeshStandardMaterial({ color: 0xD7CCC8, roughness: 0.85 }));
+      millTower.position.set(90, 18, -90);
+      millTower.castShadow = true;
+      environmentGroup.add(millTower);
+
+      // Mill Wooden Cap House
+      const millCap = new THREE.Mesh(new THREE.ConeGeometry(6.6, 6, 8), new THREE.MeshStandardMaterial({ color: 0x3E2723, roughness: 0.8 }));
+      millCap.position.set(90, 34.5, -90);
+      environmentGroup.add(millCap);
+
+      // Mill Axle & Rotating Sails
+      const millHub = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 2, 8), new THREE.MeshStandardMaterial({ color: 0x2A1B0E }));
+      millHub.rotation.x = Math.PI / 2;
+      millHub.position.set(90, 32.5, -83.5);
+      environmentGroup.add(millHub);
+
+      windmillBlades = new THREE.Group();
+      windmillBlades.position.set(90, 32.5, -82.2);
+
+      const sailBeamMat = new THREE.MeshStandardMaterial({ color: 0x3E2723, roughness: 0.8 });
+      const sailClothMat = new THREE.MeshStandardMaterial({ color: 0xF5F5DC, roughness: 0.7 });
+      for (let i = 0; i < 4; i++) {
+        const bladeArm = new THREE.Group();
+        bladeArm.rotation.z = i * (Math.PI / 2);
+
+        // Main Spar
+        const spar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 14, 0.4), sailBeamMat);
+        spar.position.set(0, 7.5, 0);
+        bladeArm.add(spar);
+
+        // Lattice Crossbars
+        for (let s = 1; s <= 5; s++) {
+          const cross = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.25, 0.15), sailBeamMat);
+          cross.position.set(1.2, 3 + s * 2, 0.1);
+          bladeArm.add(cross);
+        }
+
+        // Sail Cloth
+        const cloth = new THREE.Mesh(new THREE.BoxGeometry(2.8, 10.5, 0.08), sailClothMat);
+        cloth.position.set(1.2, 8, 0.15);
+        bladeArm.add(cloth);
+
+        windmillBlades.add(bladeArm);
+      }
+      environmentGroup.add(windmillBlades);
+
+      // 5. FARM INFRASTRUCTURE, SILOS & VEHICLES
+      // Twin Galvanized Grain Silos
+      const siloMat = new THREE.MeshStandardMaterial({ color: 0x94A3B8, metalness: 0.8, roughness: 0.25 });
+      const siloCapMat = new THREE.MeshStandardMaterial({ color: 0x64748B, metalness: 0.7 });
+      [-5, 5].forEach(sx => {
+        const silo = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 4.0, 22, 18), siloMat);
+        silo.position.set(50 + sx, 11, 55);
+        silo.castShadow = true;
+        environmentGroup.add(silo);
+
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(4.3, 3.5, 18), siloCapMat);
+        cap.position.set(50 + sx, 23.75, 55);
+        environmentGroup.add(cap);
+
+        // Stiffener Rings
+        for (let r = 1; r <= 3; r++) {
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(4.05, 0.12, 6, 18), siloCapMat);
+          ring.rotation.x = Math.PI / 2;
+          ring.position.set(50 + sx, r * 5.5, 55);
+          environmentGroup.add(ring);
+        }
+      });
+
+      // Silo Overhead Grain Chute to Barn
+      const chute = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 26, 8), siloCapMat);
+      chute.rotation.z = Math.PI / 4;
+      chute.position.set(45, 17, 40);
+      environmentGroup.add(chute);
+
+      // 3D Red Farm Tractor
+      const tractorGroup = new THREE.Group();
+      const tracBodyMat = new THREE.MeshStandardMaterial({ color: 0xDC2626, roughness: 0.4 });
+      const tireMat = new THREE.MeshStandardMaterial({ color: 0x1F2937, roughness: 0.9 });
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0xF59E0B, metalness: 0.6 });
+
+      const tBody = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.0, 5.2), tracBodyMat);
+      tBody.position.set(0, 1.8, 0);
+      tBody.castShadow = true;
+      tractorGroup.add(tBody);
+
+      // Engine Hood
+      const tHood = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 3.2), tracBodyMat);
+      tHood.position.set(0, 1.9, 3.0);
+      tractorGroup.add(tHood);
+
+      // Exhaust Stack
+      const tExhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.8, 6), new THREE.MeshStandardMaterial({ color: 0x111827 }));
+      tExhaust.position.set(0.9, 3.6, 2.2);
+      tractorGroup.add(tExhaust);
+
+      // Rear Big Wheels
+      [-1.9, 1.9].forEach(wx => {
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 1.3, 14), tireMat);
+        tire.rotation.z = Math.PI / 2;
+        tire.position.set(wx, 2.2, -1.0);
+        tire.castShadow = true;
+        tractorGroup.add(tire);
+
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 1.35, 10), rimMat);
+        rim.rotation.z = Math.PI / 2;
+        rim.position.set(wx, 2.2, -1.0);
+        tractorGroup.add(rim);
+      });
+
+      // Front Small Wheels
+      [-1.4, 1.4].forEach(wx => {
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.8, 12), tireMat);
+        tire.rotation.z = Math.PI / 2;
+        tire.position.set(wx, 1.2, 3.2);
+        tire.castShadow = true;
+        tractorGroup.add(tire);
+      });
+
+      // Rollbar Cage (ROPS)
+      const rops = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.15, 6, 8, Math.PI), new THREE.MeshStandardMaterial({ color: 0xF59E0B }));
+      rops.position.set(0, 3.5, -0.6);
+      tractorGroup.add(rops);
+
+      tractorGroup.position.set(18, 0, 15);
+      tractorGroup.rotation.y = -0.4;
+      environmentGroup.add(tractorGroup);
+
+      // Farm Wooden Utility Wagon with Crates
+      const wagonGroup = new THREE.Group();
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x8D6E63, roughness: 0.9 });
+      const wBed = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.2, 7.5), woodMat);
+      wBed.position.set(0, 1.4, 0);
+      wagonGroup.add(wBed);
+
+      // 4 Spoked Wheels
+      [[-2.2, -2.4], [2.2, -2.4], [-2.2, 2.4], [2.2, 2.4]].forEach(([px, pz]) => {
+        const wWheel = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.4, 12), postMat);
+        wWheel.rotation.z = Math.PI / 2;
+        wWheel.position.set(px, 1.1, pz);
+        wagonGroup.add(wWheel);
+      });
+
+      // Crates loaded on wagon
+      for (let c = 0; c < 4; c++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.6), new THREE.MeshStandardMaterial({ color: 0xBCAAA4 }));
+        crate.position.set((c % 2 - 0.5) * 1.8, 2.6, (Math.floor(c / 2) - 0.5) * 2.2);
+        wagonGroup.add(crate);
+      }
+      wagonGroup.position.set(18, 0, -5);
+      environmentGroup.add(wagonGroup);
+
+      // Traditional Village Water Well
+      const wellGroup = new THREE.Group();
+      const wellRing = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.5, 1.8, 12, 1, true), new THREE.MeshStandardMaterial({ color: 0x78716C, roughness: 0.9, side: THREE.DoubleSide }));
+      wellRing.position.y = 0.9;
+      wellGroup.add(wellRing);
+
+      const wellWater = new THREE.Mesh(new THREE.CircleGeometry(2.0, 12), new THREE.MeshStandardMaterial({ color: 0x1E5370 }));
+      wellWater.rotation.x = -Math.PI / 2;
+      wellWater.position.y = 0.4;
+      wellGroup.add(wellWater);
+
+      [-1.8, 1.8].forEach(px => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.6, 0.35), postMat);
+        post.position.set(px, 2.4, 0);
+        wellGroup.add(post);
+      });
+
+      const wellRoof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0x6D4C41 }));
+      wellRoof.rotation.y = Math.PI / 4;
+      wellRoof.position.y = 4.8;
+      wellGroup.add(wellRoof);
+
+      wellGroup.position.set(-14, 0, 15);
+      environmentGroup.add(wellGroup);
+
+      // 6. DETAILED VILLAGE COTTAGES, BARNS & HOUSES
       const villageHouses = [
-        { x: -35, z: 40, w: 18, d: 24, h: 10, c: 0xD7CCC8, roofC: 0xA0522D },
-        { x: -40, z: 85, w: 20, d: 26, h: 11, c: 0xCFD8DC, roofC: 0x8B4513 },
-        { x: 35, z: 35, w: 22, d: 28, h: 12, c: 0xEFEBE9, roofC: 0xB22222 },
-        { x: 40, z: 90, w: 24, d: 32, h: 14, c: 0xD7CCC8, roofC: 0xA0522D }, // Barn
-        { x: -35, z: -40, w: 18, d: 22, h: 10, c: 0xCFD8DC, roofC: 0x8B4513 },
-        { x: 35, z: -45, w: 20, d: 24, h: 10, c: 0xEFEBE9, roofC: 0xB22222 }
+        // 1. Big Red Barn
+        { x: 42, z: 22, w: 26, d: 36, h: 16, c: 0x991B1B, roofC: 0x475569, isBarn: true },
+        // 2. Main Farmer's Homestead
+        { x: -36, z: 32, w: 22, d: 26, h: 12, c: 0xF8FAFC, roofC: 0xB45309, hasPorch: true },
+        // 3. Miller's Stone House
+        { x: 52, z: -55, w: 18, d: 24, h: 11, c: 0x64748B, roofC: 0x334155, hasDormers: true },
+        // 4. Blacksmith Forge & Workshop
+        { x: -38, z: -40, w: 18, d: 24, h: 10, c: 0x4E342E, roofC: 0x64748B },
+        // 5. Country Store & Bakery
+        { x: -36, z: 85, w: 20, d: 28, h: 12, c: 0xE2E8F0, roofC: 0x78350F, hasAwning: true },
+        // 6. Forester's Timber Cabin
+        { x: -70, z: -110, w: 16, d: 20, h: 9, c: 0x5D4037, roofC: 0x2E7D32 },
+        // 7. Hay Shelter Pole Barn
+        { x: 55, z: 85, w: 22, d: 18, h: 8, c: 0x8D6E63, roofC: 0x78716C, isOpenShed: true }
       ];
 
       villageHouses.forEach(h => {
         // Walls
-        const house = new THREE.Mesh(new THREE.BoxGeometry(h.w, h.h, h.d), new THREE.MeshStandardMaterial({ color: h.c, roughness: 0.8 }));
+        const houseMat = new THREE.MeshStandardMaterial({ color: h.c, roughness: 0.8 });
+        const house = new THREE.Mesh(new THREE.BoxGeometry(h.w, h.h, h.d), houseMat);
         house.position.set(h.x, h.h / 2, h.z);
         house.castShadow = true;
         environmentGroup.add(house);
 
-        // Pitched Roof (Prism)
-        const roofGeo = new THREE.ConeGeometry(h.w * 0.85, 6, 4);
+        // Roof
+        const roofGeo = new THREE.ConeGeometry(h.w * 0.85, 6.5, 4);
         const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: h.roofC, roughness: 0.7 }));
         roof.rotation.y = Math.PI / 4;
-        roof.position.set(h.x, h.h + 3, h.z);
+        roof.position.set(h.x, h.h + 3.25, h.z);
         roof.scale.set(1, 1, h.d / h.w);
         roof.castShadow = true;
         environmentGroup.add(roof);
 
         // Chimney
-        const chim = new THREE.Mesh(new THREE.BoxGeometry(1.5, 5, 1.5), new THREE.MeshStandardMaterial({ color: 0x8D6E63 }));
-        chim.position.set(h.x + h.w * 0.25, h.h + 4.5, h.z);
-        environmentGroup.add(chim);
+        if (!h.isBarn && !h.isOpenShed) {
+          const chim = new THREE.Mesh(new THREE.BoxGeometry(1.6, 5.5, 1.6), new THREE.MeshStandardMaterial({ color: 0x8D6E63 }));
+          chim.position.set(h.x + h.w * 0.28, h.h + 4.8, h.z);
+          environmentGroup.add(chim);
+        }
+
+        // Barn Sliding Doors
+        if (h.isBarn) {
+          const door = new THREE.Mesh(new THREE.BoxGeometry(8, 9, 0.4), new THREE.MeshStandardMaterial({ color: 0xFFFFFF }));
+          door.position.set(h.x - h.w / 2 - 0.2, 4.5, h.z);
+          door.rotation.y = Math.PI / 2;
+          environmentGroup.add(door);
+        }
+
+        // Porch
+        if (h.hasPorch) {
+          const porch = new THREE.Mesh(new THREE.BoxGeometry(h.w * 0.9, 0.8, 6), postMat);
+          porch.position.set(h.x, 0.4, h.z + h.d / 2 + 3);
+          environmentGroup.add(porch);
+        }
+
+        // Windows with warm amber glow
+        const winMat = new THREE.MeshBasicMaterial({ color: 0xFFE082 });
+        [-1, 1].forEach(wx => {
+          const win = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), winMat);
+          win.position.set(h.x + wx * (h.w * 0.28), h.h * 0.55, h.z + h.d / 2 + 0.1);
+          environmentGroup.add(win);
+        });
       });
 
-      // Wooden perimeter fences
-      const fenceMat = new THREE.MeshStandardMaterial({ color: 0x6D4C41 });
-      for (let z = 20; z < 110; z += 12) {
+      // 7. FENCES, LIVESTOCK CORRAL & DRY-STONE WALLS
+      const fenceMat = new THREE.MeshStandardMaterial({ color: 0x6D4C41, roughness: 0.9 });
+      // Roadside Fences
+      for (let z = 20; z < 140; z += 12) {
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.5, 6), fenceMat);
         post.position.set(-18, 1.25, z);
         environmentGroup.add(post);
@@ -1253,56 +1623,460 @@
         environmentGroup.add(rail);
       }
 
-      // Orchard Trees
+      // Dry-Stone Field Walls
+      const stoneWallMat = new THREE.MeshStandardMaterial({ color: 0x64748B, roughness: 0.95 });
+      for (let x = -210; x < -60; x += 18) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(18, 1.4, 1.8), stoneWallMat);
+        wall.position.set(x + 9, 0.7, 105);
+        wall.castShadow = true;
+        environmentGroup.add(wall);
+      }
+
+      // Wooden Utility Poles along Dirt Road
+      for (let z = -200; z <= 200; z += 90) {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 16, 6), postMat);
+        pole.position.set(16, 8, z);
+        environmentGroup.add(pole);
+
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.25, 0.25), postMat);
+        arm.position.set(16, 15, z);
+        environmentGroup.add(arm);
+      }
+
+      // 8. RICH FOLIAGE, ORCHARD & TREES
+      // Fruit Apple Orchard (4x3 grid)
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 3; c++) {
+          const ox = -95 + c * 16;
+          const oz = -40 + r * 16;
+          const oTree = new THREE.Group();
+          const oTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 4.5, 6), postMat);
+          oTrunk.position.y = 2.25;
+          oTree.add(oTrunk);
+
+          const oFoliage = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 8), new THREE.MeshStandardMaterial({ color: 0x2E6930, roughness: 0.8 }));
+          oFoliage.position.y = 5.2;
+          oTree.add(oFoliage);
+
+          // Red fruit dots
+          const fruitMat = new THREE.MeshBasicMaterial({ color: 0xDC2626 });
+          for (let f = 0; f < 5; f++) {
+            const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.3, 4, 4), fruitMat);
+            fruit.position.set(Math.sin(f * 1.4) * 2.8, 5.0 + Math.cos(f * 1.2) * 1.5, Math.cos(f * 1.8) * 2.8);
+            oTree.add(fruit);
+          }
+          oTree.position.set(ox, 0, oz);
+          environmentGroup.add(oTree);
+        }
+      }
+
+      // Clustered Trees around village outskirts
       addTreesCluster([
-        { x: -70, z: 30 }, { x: -85, z: 50 }, { x: -75, z: 75 },
-        { x: 75, z: 30 }, { x: 90, z: 55 }, { x: 80, z: 80 }
+        { x: -50, z: 60 }, { x: -65, z: 80 }, { x: -55, z: 105 },
+        { x: 55, z: -25 }, { x: 70, z: -50 }, { x: 75, z: 80 }, { x: 80, z: 120 }
       ]);
     }
 
-    // D. COASTAL PORT BUILDER (Water surface, docks, containers, cranes)
+    // D. COASTAL INDUSTRIAL PORT & MARITIME BASIN BUILDER
     function buildCoastalPort() {
-      // Ocean Water Plane
-      const waterMat = new THREE.MeshStandardMaterial({ color: 0x0A2540, roughness: 0.1, metalness: 0.8 });
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(1200, 600), waterMat);
-      water.rotation.x = -Math.PI / 2;
-      water.position.set(0, 0, -300);
-      environmentGroup.add(water);
+      // 1. Multi-Depth Ocean Water Surface
+      const oceanMat = new THREE.MeshStandardMaterial({ color: 0x0A223E, roughness: 0.15, metalness: 0.85 });
+      const oceanWater = new THREE.Mesh(new THREE.PlaneGeometry(1400, 700), oceanMat);
+      oceanWater.rotation.x = -Math.PI / 2;
+      oceanWater.position.set(0, 0, -350);
+      environmentGroup.add(oceanWater);
+      coastalWaterMesh = oceanWater;
 
-      // Concrete Dock Pier Base
-      const pier = new THREE.Mesh(new THREE.BoxGeometry(600, 4, 300), new THREE.MeshStandardMaterial({ color: 0x64748B, roughness: 0.85 }));
-      pier.position.set(0, 2, 150);
+      // Shallow Coastal Turquoise Shelf along Docks
+      const shallowMat = new THREE.MeshStandardMaterial({ color: 0x0284C7, roughness: 0.2, metalness: 0.5, transparent: true, opacity: 0.55 });
+      const shallowShelf = new THREE.Mesh(new THREE.PlaneGeometry(1400, 160), shallowMat);
+      shallowShelf.rotation.x = -Math.PI / 2;
+      shallowShelf.position.set(0, 0.05, -80);
+      environmentGroup.add(shallowShelf);
+
+      // 2. Concrete Quayside Dock Apron (Industrial Pier Base)
+      const pierMat = new THREE.MeshStandardMaterial({ color: 0x64748B, roughness: 0.85 });
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(680, 5, 320), pierMat);
+      pier.position.set(0, 2.5, 160);
       pier.receiveShadow = true;
       environmentGroup.add(pier);
 
-      // Stacked Cargo Shipping Containers (Red, Blue, Green, Orange)
-      const colors = [0xB91C1C, 0x1D4ED8, 0x15803D, 0xC2410C];
-      for (let row = 0; row < 5; row++) {
-        for (let col = 0; col < 6; col++) {
-          const stackH = (row + col) % 3 + 1;
-          for (let s = 0; s < stackH; s++) {
-            const cMat = new THREE.MeshStandardMaterial({ color: colors[(row + col + s) % colors.length], roughness: 0.6 });
-            const cMesh = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 24), cMat);
-            cMesh.position.set(-120 + col * 14, 4 + s * 4 + 2, 60 + row * 28);
-            cMesh.castShadow = true;
-            environmentGroup.add(cMesh);
+      // Dock Seawall Waterline Rubber Bumpers & Bollards
+      const fenderMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.9 });
+      const bollardMat = new THREE.MeshStandardMaterial({ color: 0x0F172A, metalness: 0.7 });
+      for (let x = -280; x <= 280; x += 18) {
+        // Mooring Bollards
+        const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 1.4, 8), bollardMat);
+        bollard.position.set(x, 5.7, 1);
+        bollard.castShadow = true;
+        environmentGroup.add(bollard);
+
+        // Waterline Rubber Bumpers
+        const fender = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 3.2, 8), fenderMat);
+        fender.position.set(x, 2.5, -0.6);
+        environmentGroup.add(fender);
+      }
+
+      // Yellow/Black Safety Striping along Dock Edge
+      const hazardStripe = new THREE.Mesh(new THREE.PlaneGeometry(580, 1.2), new THREE.MeshStandardMaterial({ color: 0xF59E0B }));
+      hazardStripe.rotation.x = -Math.PI / 2;
+      hazardStripe.position.set(0, 5.05, 3.5);
+      environmentGroup.add(hazardStripe);
+
+      // 3. Rocky Granite Breakwater Jetty
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95, flatShading: true });
+      for (let i = 0; i < 28; i++) {
+        const bz = -20 - i * 8;
+        const bx = 160 + Math.sin(i * 0.4) * 8;
+        const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(5.5 + (i % 3) * 1.5, 1), rockMat);
+        boulder.position.set(bx, 2.5, bz);
+        boulder.castShadow = true;
+        environmentGroup.add(boulder);
+      }
+
+      // 4. FULL-SCALE 3D CONTAINER CARGO SHIP (FREIGHTER)
+      const shipGroup = new THREE.Group();
+      // Hull - Underwater Red Section
+      const hullLower = new THREE.Mesh(new THREE.BoxGeometry(135, 6, 24), new THREE.MeshStandardMaterial({ color: 0x991B1B, roughness: 0.6 }));
+      hullLower.position.set(0, 1.5, 0);
+      shipGroup.add(hullLower);
+
+      // Hull - Topsides Dark Naval Slate
+      const hullUpper = new THREE.Mesh(new THREE.BoxGeometry(140, 8, 26), new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.5 }));
+      hullUpper.position.set(0, 7, 0);
+      hullUpper.castShadow = true;
+      shipGroup.add(hullUpper);
+
+      // Bow Wedge (Pointed front)
+      const bowGeo = new THREE.ConeGeometry(13, 24, 4);
+      const bow = new THREE.Mesh(bowGeo, new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.5 }));
+      bow.rotation.z = Math.PI / 2;
+      bow.rotation.y = Math.PI / 4;
+      bow.position.set(78, 7, 0);
+      bow.scale.set(1, 1, 0.7);
+      shipGroup.add(bow);
+
+      // Stern Deckhouse / Bridge Superstructure
+      const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xF8FAFC, roughness: 0.4 });
+      const bridgeBase = new THREE.Mesh(new THREE.BoxGeometry(22, 16, 20), bridgeMat);
+      bridgeBase.position.set(-45, 17, 0);
+      bridgeBase.castShadow = true;
+      shipGroup.add(bridgeBase);
+
+      // Navigation Bridge Deck (Top storey)
+      const navDeck = new THREE.Mesh(new THREE.BoxGeometry(25, 4, 22), bridgeMat);
+      navDeck.position.set(-45, 26, 0);
+      shipGroup.add(navDeck);
+
+      // Bridge Windows
+      const winStrip = new THREE.Mesh(new THREE.BoxGeometry(25.2, 1.4, 22.2), new THREE.MeshStandardMaterial({ color: 0x0F172A }));
+      winStrip.position.set(-45, 26.5, 0);
+      shipGroup.add(winStrip);
+
+      // Ship Exhaust Funnel / Smokestack
+      const funnel = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.5, 9, 10), new THREE.MeshStandardMaterial({ color: 0x1E293B }));
+      funnel.position.set(-54, 30, 0);
+      shipGroup.add(funnel);
+
+      const funnelStripe = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.2, 2.5, 10), new THREE.MeshStandardMaterial({ color: 0xF59E0B }));
+      funnelStripe.position.set(-54, 31, 0);
+      shipGroup.add(funnelStripe);
+
+      // Communications & Radar Mast
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 14, 6), new THREE.MeshStandardMaterial({ color: 0xF8FAFC }));
+      mast.position.set(-42, 34, 0);
+      shipGroup.add(mast);
+
+      // Orange Lifeboats on Davits
+      const lbMat = new THREE.MeshStandardMaterial({ color: 0xEA580C });
+      [-11, 11].forEach(ly => {
+        const lb = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 2.8), lbMat);
+        lb.position.set(-45, 21, ly);
+        shipGroup.add(lb);
+      });
+
+      // Cargo Containers on Ship Deck (3 tiers in bays)
+      const shipColors = [0x0284C7, 0x15803D, 0xDC2626, 0xEA580C];
+      for (let bay = 0; bay < 4; bay++) {
+        for (let row = -1; row <= 1; row++) {
+          const tierMax = (bay === 3) ? 2 : 3;
+          for (let tier = 0; tier < tierMax; tier++) {
+            const sc = shipColors[(bay + row + tier + 5) % shipColors.length];
+            const box = new THREE.Mesh(new THREE.BoxGeometry(18, 4.2, 6.5), new THREE.MeshStandardMaterial({ color: sc, roughness: 0.6 }));
+            box.position.set(-18 + bay * 21, 12 + tier * 4.2, row * 7.5);
+            box.castShadow = true;
+            shipGroup.add(box);
           }
         }
       }
 
-      // Port Crane Gantry Tower
-      const craneMat = new THREE.MeshStandardMaterial({ color: 0xD97706, metalness: 0.6 });
-      const craneLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 45, 6), craneMat);
-      craneLegL.position.set(-60, 22.5, 8);
-      environmentGroup.add(craneLegL);
+      shipGroup.position.set(-35, 0, -55);
+      environmentGroup.add(shipGroup);
 
-      const craneLegR = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 45, 6), craneMat);
-      craneLegR.position.set(-20, 22.5, 8);
-      environmentGroup.add(craneLegR);
+      // 5. SHIP-TO-SHORE (STS) CONTAINER GANTRY CRANES (2 Towering Cranes)
+      [-65, 10].forEach(cx => {
+        const craneGroup = new THREE.Group();
+        const cMat = new THREE.MeshStandardMaterial({ color: 0xEA580C, metalness: 0.4, roughness: 0.5 });
 
-      const craneBoom = new THREE.Mesh(new THREE.BoxGeometry(90, 4, 6), craneMat);
-      craneBoom.position.set(-40, 44, -10);
-      environmentGroup.add(craneBoom);
+        // 4 Portal Legs
+        [[-10, 8], [10, 8], [-10, 36], [10, 36]].forEach(([lx, lz]) => {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 44, 6), cMat);
+          leg.position.set(lx, 22, lz);
+          leg.castShadow = true;
+          craneGroup.add(leg);
+        });
+
+        // Machine House & Machinery Deck
+        const mHouse = new THREE.Mesh(new THREE.BoxGeometry(26, 7, 30), cMat);
+        mHouse.position.set(0, 44, 22);
+        craneGroup.add(mHouse);
+
+        // Operator Cab
+        const opCab = new THREE.Mesh(new THREE.BoxGeometry(4, 3.5, 4), new THREE.MeshStandardMaterial({ color: 0x0F172A }));
+        opCab.position.set(0, 40, 4);
+        craneGroup.add(opCab);
+
+        // Horizontal Boom extending out over ship & back over dock (Total 88m long)
+        const boom = new THREE.Mesh(new THREE.BoxGeometry(12, 4.5, 88), cMat);
+        boom.position.set(0, 46, -14);
+        craneGroup.add(boom);
+
+        // Suspended Trolley & Container Spreader
+        const trolley = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 6), new THREE.MeshStandardMaterial({ color: 0xF59E0B }));
+        trolley.position.set(0, 43, -38);
+        craneGroup.add(trolley);
+
+        const spreader = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.2, 14), new THREE.MeshStandardMaterial({ color: 0xF59E0B }));
+        spreader.position.set(0, 26, -38);
+        craneGroup.add(spreader);
+
+        // Steel Cables
+        [-5, 5].forEach(cz => {
+          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 17, 4), new THREE.MeshStandardMaterial({ color: 0x1E293B }));
+          cable.position.set(0, 34.5, -38 + cz);
+          craneGroup.add(cable);
+        });
+
+        craneGroup.position.set(cx, 0, 0);
+        environmentGroup.add(craneGroup);
+      });
+
+      // 6. ACTIVE COASTAL LIGHTHOUSE ON ROCKY HEADLAND
+      const cliff = new THREE.Mesh(new THREE.CylinderGeometry(30, 42, 22, 12), rockMat);
+      cliff.position.set(230, 11, -110);
+      cliff.castShadow = true;
+      environmentGroup.add(cliff);
+
+      // Lighthouse Tower with Red & White Bands
+      const lhTowerGroup = new THREE.Group();
+      const lhWhite = new THREE.MeshStandardMaterial({ color: 0xF8FAFC, roughness: 0.5 });
+      const lhRed = new THREE.MeshStandardMaterial({ color: 0xDC2626, roughness: 0.5 });
+
+      for (let s = 0; s < 5; s++) {
+        const r1 = 6.2 - s * 0.45;
+        const r2 = 6.2 - (s + 1) * 0.45;
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, 6, 14), (s % 2 === 0) ? lhWhite : lhRed);
+        band.position.set(0, 3 + s * 6, 0);
+        band.castShadow = true;
+        lhTowerGroup.add(band);
+      }
+
+      // Observation Gallery Catwalk
+      const gallery = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 1.2, 14), new THREE.MeshStandardMaterial({ color: 0x1E293B }));
+      gallery.position.set(0, 33.6, 0);
+      lhTowerGroup.add(gallery);
+
+      // Glass Lantern Room
+      const lantern = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 4.2, 12), new THREE.MeshStandardMaterial({ color: 0xFEF08A, roughness: 0.1, transparent: true, opacity: 0.85 }));
+      lantern.position.set(0, 36.3, 0);
+      lhTowerGroup.add(lantern);
+
+      // Copper Dome Roof
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(3.7, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.6 }));
+      dome.position.set(0, 38.4, 0);
+      lhTowerGroup.add(dome);
+
+      // Sweeping Searchlight Spotlight Beam
+      lighthouseBeam = new THREE.Group();
+      lighthouseBeam.position.set(0, 36.5, 0);
+
+      const lhSpot = new THREE.SpotLight(0xFFFBEB, 3.5, 600, Math.PI / 7, 0.35);
+      lhSpot.position.set(0, 0, 0);
+      const lhTarget = new THREE.Object3D();
+      lhTarget.position.set(120, -10, 0);
+      lighthouseBeam.add(lhTarget);
+      lhSpot.target = lhTarget;
+      lighthouseBeam.add(lhSpot);
+
+      // Translucent Volumetric Light Cone
+      const beamCone = new THREE.Mesh(new THREE.ConeGeometry(24, 140, 16), new THREE.MeshBasicMaterial({ color: 0xFFFBEB, transparent: true, opacity: 0.18, side: THREE.DoubleSide }));
+      beamCone.rotation.z = -Math.PI / 2;
+      beamCone.position.set(70, 0, 0);
+      lighthouseBeam.add(beamCone);
+
+      lhTowerGroup.add(lighthouseBeam);
+      lhTowerGroup.position.set(230, 22, -110);
+      environmentGroup.add(lhTowerGroup);
+
+      // Lighthouse Keeper's White Cottage
+      const lhCottage = new THREE.Mesh(new THREE.BoxGeometry(16, 8, 20), lhWhite);
+      lhCottage.position.set(210, 26, -95);
+      lhCottage.castShadow = true;
+      environmentGroup.add(lhCottage);
+
+      const lhCottageRoof = new THREE.Mesh(new THREE.ConeGeometry(14, 5, 4), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+      lhCottageRoof.rotation.y = Math.PI / 4;
+      lhCottageRoof.position.set(210, 32.5, -95);
+      lhCottageRoof.scale.set(1, 1, 20 / 16);
+      environmentGroup.add(lhCottageRoof);
+
+      // 7. TIMBER FINGER PIER & SMALL HARBOUR CRAFT
+      const timberPier = new THREE.Mesh(new THREE.BoxGeometry(16, 3, 110), new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.95 }));
+      timberPier.position.set(-180, 2.5, -60);
+      timberPier.receiveShadow = true;
+      environmentGroup.add(timberPier);
+
+      // Timber Pilings beneath pier
+      for (let pz = -105; pz <= -15; pz += 20) {
+        [-7, 7].forEach(px => {
+          const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 8, 6), new THREE.MeshStandardMaterial({ color: 0x3E2723 }));
+          pile.position.set(-180 + px, 0, pz);
+          environmentGroup.add(pile);
+        });
+      }
+
+      // Moored Coastal Patrol Boat
+      const patrolBoat = new THREE.Group();
+      const pbHull = new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 28), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+      pbHull.position.y = 1.6;
+      patrolBoat.add(pbHull);
+
+      const pbCabin = new THREE.Mesh(new THREE.BoxGeometry(6.5, 3.0, 12), new THREE.MeshStandardMaterial({ color: 0xF8FAFC }));
+      pbCabin.position.set(0, 4.2, -2);
+      patrolBoat.add(pbCabin);
+
+      patrolBoat.position.set(-165, 0, -60);
+      environmentGroup.add(patrolBoat);
+
+      // Floating Marine Channel Navigation Buoys (Red & Green)
+      buoyGroupList = [];
+      const buoyDefs = [
+        { x: 80, z: -190, c: 0x15803D, lightC: 0x22C55E }, // Green Starboard
+        { x: -90, z: -190, c: 0xDC2626, lightC: 0xEF4444 }  // Red Port
+      ];
+      buoyDefs.forEach(b => {
+        const buoy = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.2, 4.5, 10), new THREE.MeshStandardMaterial({ color: b.c, roughness: 0.5 }));
+        base.position.y = 1.5;
+        buoy.add(base);
+
+        const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.2, 2.2, 6, 1, true), new THREE.MeshStandardMaterial({ color: 0x1E293B }));
+        cage.position.y = 4.2;
+        buoy.add(cage);
+
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color: b.lightC }));
+        beacon.position.y = 5.2;
+        buoy.add(beacon);
+
+        buoy.position.set(b.x, 0, b.z);
+        buoy.userData = { baseY: 0 };
+        environmentGroup.add(buoy);
+        buoyGroupList.push(buoy);
+      });
+
+      // 8. VAST CONTAINER TERMINAL STORAGE YARD
+      const yardColors = [0x0284C7, 0x15803D, 0xDC2626, 0xEA580C, 0xF59E0B, 0x475569];
+      // Organized in 3 Large Container Bay Blocks
+      for (let block = 0; block < 3; block++) {
+        const bBaseX = -190 + block * 110;
+        for (let col = 0; col < 4; col++) {
+          for (let row = 0; row < 5; row++) {
+            const hCount = (col + row + block) % 3 + 2; // 2 to 4 containers high
+            for (let h = 0; h < hCount; h++) {
+              const cCol = yardColors[(block * 3 + col * 2 + row + h) % yardColors.length];
+              const cBox = new THREE.Mesh(new THREE.BoxGeometry(10, 4.2, 22), new THREE.MeshStandardMaterial({ color: cCol, roughness: 0.55 }));
+              cBox.position.set(bBaseX + col * 12.5, 5 + h * 4.2 + 2.1, 80 + row * 26);
+              cBox.castShadow = true;
+              environmentGroup.add(cBox);
+            }
+          }
+        }
+      }
+
+      // Container Handling Reach-Stacker Vehicle
+      const reacher = new THREE.Group();
+      const rBody = new THREE.Mesh(new THREE.BoxGeometry(5.5, 4.0, 11), new THREE.MeshStandardMaterial({ color: 0xF59E0B }));
+      rBody.position.y = 4.0;
+      reacher.add(rBody);
+
+      const rBoom = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 20), new THREE.MeshStandardMaterial({ color: 0x1F2937 }));
+      rBoom.position.set(0, 11, -3);
+      rBoom.rotation.x = -0.3;
+      reacher.add(rBoom);
+
+      // Suspended 40ft container held aloft
+      const liftedCont = new THREE.Mesh(new THREE.BoxGeometry(10, 4.2, 22), new THREE.MeshStandardMaterial({ color: 0x0284C7 }));
+      liftedCont.position.set(0, 14, -12);
+      reacher.add(liftedCont);
+
+      reacher.position.set(-75, 5, 60);
+      reacher.rotation.y = 0.5;
+      environmentGroup.add(reacher);
+
+      // Logistics Distribution Warehouses (Background)
+      const whMat = new THREE.MeshStandardMaterial({ color: 0xE2E8F0, roughness: 0.6 });
+      const whRoofMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 });
+      [-100, 30].forEach(wx => {
+        const wh = new THREE.Mesh(new THREE.BoxGeometry(65, 14, 45), whMat);
+        wh.position.set(wx, 12, 240);
+        wh.castShadow = true;
+        environmentGroup.add(wh);
+
+        const whRoof = new THREE.Mesh(new THREE.ConeGeometry(52, 6, 4), whRoofMat);
+        whRoof.rotation.y = Math.PI / 4;
+        whRoof.position.set(wx, 22, 240);
+        whRoof.scale.set(1, 1, 45 / 65);
+        environmentGroup.add(whRoof);
+      });
+
+      // 9. PETROCHEMICAL / BULK FUEL TANK FARM
+      const tankMat = new THREE.MeshStandardMaterial({ color: 0xF1F5F9, roughness: 0.4 });
+      const pipeMat = new THREE.MeshStandardMaterial({ color: 0xF59E0B, metalness: 0.5 });
+      // Concrete Containment Bund Dike
+      const bund = new THREE.Mesh(new THREE.BoxGeometry(110, 3.5, 75), new THREE.MeshStandardMaterial({ color: 0x94A3B8 }));
+      bund.position.set(170, 6.75, 230);
+      environmentGroup.add(bund);
+
+      [[-28, -16], [28, -16], [0, 16]].forEach(([tx, tz]) => {
+        const tank = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 16, 22), tankMat);
+        tank.position.set(170 + tx, 13, 230 + tz);
+        tank.castShadow = true;
+        environmentGroup.add(tank);
+
+        const domeRoof = new THREE.Mesh(new THREE.SphereGeometry(14.2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), tankMat);
+        domeRoof.position.set(170 + tx, 21, 230 + tz);
+        environmentGroup.add(domeRoof);
+      });
+
+      // 10. HIGH-MAST INDUSTRIAL FLOODLIGHT TOWERS (4 Towers)
+      const towerLocs = [
+        { x: -210, z: 65 }, { x: 90, z: 65 },
+        { x: -210, z: 210 }, { x: 90, z: 210 }
+      ];
+      towerLocs.forEach(t => {
+        const tPole = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.2, 38, 8), new THREE.MeshStandardMaterial({ color: 0x94A3B8, metalness: 0.7 }));
+        tPole.position.set(t.x, 24, t.z);
+        environmentGroup.add(tPole);
+
+        const tHead = new THREE.Mesh(new THREE.BoxGeometry(6, 1.2, 3.5), new THREE.MeshStandardMaterial({ color: 0x1E293B }));
+        tHead.position.set(t.x, 43, t.z);
+        environmentGroup.add(tHead);
+
+        const tLight = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 2.8), new THREE.MeshBasicMaterial({ color: 0xFFFBEB }));
+        tLight.rotation.x = Math.PI / 2;
+        tLight.position.set(t.x, 42.3, t.z);
+        environmentGroup.add(tLight);
+      });
     }
 
     function addTreesCluster(positions) {
@@ -1705,6 +2479,27 @@
       droneRotors.forEach(r => {
         r.rotation.y += 32 * delta;
       });
+
+      // Animate Windmill Sails in Rural Village
+      if (windmillBlades) {
+        windmillBlades.rotation.z += 1.2 * delta;
+      }
+
+      // Animate Rotating Lighthouse Light Beam in Coastal Port
+      if (lighthouseBeam) {
+        lighthouseBeam.rotation.y += 0.8 * delta;
+      }
+
+      // Animate Gentle Marine Buoy Bobbing & Swell
+      buoyGroupList.forEach((buoy, idx) => {
+        buoy.position.y = buoy.userData.baseY + Math.sin(time * 2.2 + idx * 1.6) * 0.35;
+        buoy.rotation.z = Math.sin(time * 1.8 + idx) * 0.06;
+      });
+
+      // Subtle Water Surface Swell in Coastal Port
+      if (coastalWaterMesh) {
+        coastalWaterMesh.position.y = Math.sin(time * 1.4) * 0.18;
+      }
 
       // Blink Drone Strobe
       if (droneStrobeMesh && state.lightingType !== 'stealth') {
