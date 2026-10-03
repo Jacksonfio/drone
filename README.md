@@ -2,25 +2,95 @@
 
 [![System Status](https://img.shields.io/badge/System-ONLINE-15803d.svg)](https://github.com/Jacksonfio/drone)
 [![Engine](https://img.shields.io/badge/3D%20Engine-Three.js%20WebGL-1d4ed8.svg)](https://threejs.org/)
-[![Architecture](https://img.shields.io/badge/Architecture-3--Layer%20AI%20Simulation-0f172a.svg)](https://github.com/Jacksonfio/drone)
-[![Mode](https://img.shields.io/badge/Operational%20Modes-Trainee%20%7C%20Instructor-blue.svg)](https://github.com/Jacksonfio/drone)
+[![Rendering](https://img.shields.io/badge/Rendering-Real--Time%20Hardware%20Accelerated-blue.svg)](https://github.com/Jacksonfio/drone)
+[![Operational Modes](https://img.shields.io/badge/Operational%20Modes-Trainee%20%7C%20Instructor-blue.svg)](https://github.com/Jacksonfio/drone)
 [![License](https://img.shields.io/badge/License-Proprietary%20Defense%20Simulator-0f172a.svg)](LICENSE)
 
-**THREATVERSE** is an enterprise-grade, browser-based **Counter-Drone Training Simulator** designed for air defense operators, security coordinators, and C-UAS trainees. It emphasizes the hardest human problem in airspace protection: **rapid, evidence-based decision-making under simulated sensor uncertainty, atmospheric degradation, and urban/rural clutter.**
+**THREATVERSE** is an interactive, browser-based **Counter-Drone Training Simulator** designed for air defense operators, security coordinators, and C-UAS trainees. It emphasizes the hardest human problem in airspace protection: **rapid, evidence-based decision-making under simulated sensor uncertainty, atmospheric degradation, and urban/rural clutter.**
 
 ---
 
-## 🎯 10-Second Problem Statement
+## 🎯 Problem Statement
 
-> **Counter-drone training today is either too expensive (live field exercises costing thousands per hour) or too simplistic (static slide decks and passive video tests). Most existing simulators focus on weapon destruction rather than the critical cognitive bottleneck: detecting, tracking, classifying, and escalating ambiguous targets when sensor data is noisy and incomplete.**
+> **Many existing training approaches emphasize basic detection or predefined scenarios, while realistic decision-making under uncertainty, clutter, and incomplete evidence remains difficult to reproduce consistently.**
 > 
-> **THREATVERSE solves this by delivering an interactive, browser-based counter-drone training simulator with evidence-based temporal replay ("What Did I Know Then?") and closed-loop adaptive curriculum generation.**
+> **THREATVERSE addresses this through an interactive browser-based 3D training simulator with temporal evidence reconstruction and adaptive scenario generation.**
 
 ---
 
-## 💡 Core Innovation: Closed-Loop Adaptive Training
+## 🏛️ System Architecture
 
-Traditional simulators operate as open-loop video players: a scenario plays, the user clicks, and a score is shown. THREATVERSE implements a continuous 6-stage closed-loop cognitive learning architecture:
+The core technical pipeline connects procedural simulation to evidence-based assessment and adaptive loop generation:
+
+```text
+                         THREATVERSE
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+       INSTRUCTOR STUDIO                TRAINEE PROFILE
+              │                               │
+              └───────────────┬───────────────┘
+                              ↓
+                      SCENARIO DIRECTOR
+                              ↓
+                 PROCEDURAL SCENARIO ENGINE
+                              ↓
+                    ┌─────────────────┐
+                    │ THREE.JS 3D     │
+                    │ SIMULATOR       │
+                    └────────┬────────┘
+                             ↓
+             ┌───────────────┼───────────────┐
+             ↓               ↓               ↓
+          3D VIEW          RADAR             MAP
+             └───────────────┼───────────────┘
+                             ↓
+                     TRAINEE DECISION
+                             ↓
+                    DETECT → CLASSIFY
+                             ↓
+                    ASSESS → RESPOND
+                             ↓
+                      EVENT LOGGER
+                             ↓
+              ┌──────────────┴──────────────┐
+              ↓                             ↓
+        GROUND TRUTH                  TRAINEE ACTION
+              └──────────────┬──────────────┘
+                             ↓
+                       SCORING ENGINE
+                             ↓
+                    AFTER-ACTION REVIEW
+                             ↓
+                      3D REPLAY ENGINE
+                             ↓
+                 "WHAT DID I KNOW THEN?"
+                             ↓
+                       SKILL ANALYSIS
+                             ↓
+                   DIFFICULTY ENGINE
+                             ↓
+                  ADAPTIVE NEXT SCENARIO
+                             │
+                             └──────────────→ LOOP
+```
+
+### The Core Technical Story:
+* **Three.js** $\rightarrow$ Creates the world with real-time rendering.
+* **Scenario Engine** $\rightarrow$ Creates the challenge through deterministic seeds.
+* **Ground Truth** $\rightarrow$ Knows what actually happened in the simulation state.
+* **Trainee Interface** $\rightarrow$ Captures human observation, classification, and response decisions.
+* **Event Logger** $\rightarrow$ Records the timestamped evidence state at the exact moment of commitment.
+* **Scoring Engine** $\rightarrow$ Measures performance against available evidence rather than hindsight.
+* **Temporal Reconstruction** $\rightarrow$ Explains and contextualizes the decision chronologically.
+* **Skill Analysis** $\rightarrow$ Identifies specific cognitive and procedural weaknesses.
+* **Adaptive Engine** $\rightarrow$ Modulates difficulty and creates the next tailored drill.
+
+---
+
+## 🔄 Core Innovation: Closed-Loop Adaptive Training
+
+Designed around a continuous 6-stage closed-loop learning architecture:
 
 ```mermaid
 flowchart LR
@@ -32,128 +102,131 @@ flowchart LR
     F --> A
 ```
 
-1. **Scenario Generation:** Instantly generated from a deterministic Scenario Seed (`TV-CITY-00482`, `Seed: 928173`) ensuring identical, shareable conditions for comparative benchmarking.
-2. **Decision Recording:** Trainee classifies target identity (`DRONE`, `NON-THREAT`, `UNKNOWN`) and selects escalation action (`MONITOR`, `VERIFY`, `ALERT`) under time pressure.
-3. **Evidence Audit:** Evaluates decisions against the evidence available to the trainee at that exact second—not against hindsight ground truth.
-4. **Performance Scoring:** Trainee performance is scored across 8 cognitive and procedural dimensions.
-5. **Dynamic Difficulty Adjustment:** Adaptive engine calculates performance deficits (e.g. low-altitude fog classification failure) and raises or lowers difficulty (1.0 to 10.0 scale).
-6. **New Scenario Synthesis:** The system autonomously spins up a targeted synthetic drill calibrated precisely to bridge the trainee's diagnosed weaknesses.
+### Dynamic Difficulty Engine Workflow:
+The engine adjusts scenario difficulty using measurable trainee performance signals such as detection latency, false-alarm frequency, decision timing, object count, visibility, and scenario complexity:
+
+```text
+Trainee Performance
+        ↓
+Performance Analysis
+        ↓
+Weakness Identification
+        ↓
+Difficulty Adjustment
+        ↓
+Scenario Generation
+        ↓
+New Training Session
+```
 
 ---
 
 ## ⏱️ Signature Feature: *"What Did I Know Then?"* Temporal Reconstruction
 
-The greatest flaw in standard After-Action Reviews (AAR) is **hindsight bias**: instructors and trainees judge early decisions with knowledge of what the drone turned out to be.
+The greatest obstacle in standard After-Action Reviews (AAR) is **hindsight bias**: instructors and trainees evaluate early actions with complete post-event knowledge.
 
 | Traditional Simulator Replay | THREATVERSE Temporal Reconstruction |
 |---|---|
-| Replays the entire event with full god-mode clarity | Freezes the exact visual and sensor telemetry stream at the decision moment |
-| Reveals ground truth immediately ("You missed a drone") | Reconstructs the trainee's optical view, sensor confidence, and radar noise |
+| Replays the entire event with full god-mode clarity | Freezes the exact simulated sensor uncertainty, confidence levels, optical occlusions, and radar-state variations available at the moment of decision |
+| Reveals ground truth immediately ("You missed a drone") | Reconstructs the trainee's optical view, sensor confidence, and radar state |
 | Fosters hindsight bias and inaccurate blame | Evaluates whether the decision was sound **given the available evidence** |
 | Single scalar score (Pass/Fail) | Complete structured evidence audit log across timestamped decision steps |
 
-### Interactive 4-Stage Reconstruction Timeline:
-* **T+00:15 (First Contact):** Ambiguous radar blip on periphery (Simulated Distance: 280m, RCS: 0.04m², Fog: 65%). Action: Trainee initiated visual slew.
-* **T+00:42 (Optical Acquisition):** Visual acquired at 180m; silhouette partially occluded by high-rise building edge. Trainee marked `UNKNOWN`, escalated to `VERIFY`.
-* **T+01:10 (Critical Decision Point):** Target descends to 28m at 85m range, exhibiting station-keeping hover kinematics. Trainee classified `DRONE` and escalated to `ALERT`.
-* **T+01:30 (Ground Truth Resolution):** Ground truth unmasked: Commercial Quadcopter carrying optical gimbal. Decision logged as **Optimal Verification Calibration**.
+### Ground Truth & Decision Evaluation Relationship:
+
+```text
+                    SIMULATION STATE
+                           │
+                 ┌─────────┴─────────┐
+                 ↓                   ↓
+          TRAINEE VIEW          GROUND TRUTH
+                 │                   │
+                 ↓                   ↓
+          TRAINEE DECISION ───→ SCORING ENGINE
+                                      ↓
+                                EVENT LOGGER
+                                      ↓
+                                  AAR / REPLAY
+```
 
 ---
 
 ## 📊 8-Dimension Evidence-Based Performance Profile
 
-Rather than a simple percentage score, THREATVERSE evaluates trainees across an 8-dimensional competency vector:
+The scoring framework evaluates trainees across eight structured dimensions rather than arbitrary percentages:
 
-1. **Detection Latency (92%):** Mean time elapsed between target appearance in training airspace and initial cursor acquisition.
-2. **Classification Accuracy (88%):** Correct differentiation between drones, birds, fixed-wing aircraft, and ground reflections.
-3. **Decision Appropriateness (95%):** Alignment of response action (`MONITOR`, `VERIFY`, `ALERT`) with verified threat proximity and kinematics.
-4. **Response Timing (84%):** Speed of escalation execution once sufficient corroborating evidence is established.
-5. **Evidence Calibration (79%):** Trainee's ability to resist prematurely escalating when sensor confidence is below minimum thresholds.
-6. **Uncertainty Handling (86%):** Decision robustness in degraded visual environments (dense fog, nocturnal lighting, rain).
-7. **Multi-Object Tracking (73%):** Situational awareness retention when tracking simultaneous incursions or decoy wildlife.
-8. **Cross-Scenario Consistency (91%):** Standard deviation of performance across identical and varying scenario seeds.
-
----
-
-## ⚙️ 3-Layer AI Architecture
-
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                   THREATVERSE 3-LAYER ARCHITECTURE                     │
-├────────────────────────────────────────────────────────────────────────┤
-│ Layer 3: Generative AI Parameterizer                                   │
-│   • Natural-Language Prompt Parser ("Create heavy fog port incursion") │
-│   • Deterministic Seed Compilation (e.g. Seed #928173)                 │
-│   • Reproducible Scenario Code Generation (TV-PORT-00812)              │
-├────────────────────────────────────────────────────────────────────────┤
-│ Layer 2: Adaptive Intelligence & Evaluation Engine                     │
-│   • 8-Dimension Cognitive Performance Vector Evaluator                 │
-│   • Dynamic Difficulty Engine (Calibrates on 1.0 - 10.0 scale)         │
-│   • Temporal Evidence Reconstruction ("What Did I Know Then?")         │
-├────────────────────────────────────────────────────────────────────────┤
-│ Layer 1: Deterministic 3D Simulation & Kinematic Layer                 │
-│   • Three.js WebGL 60 FPS Hardware-Accelerated Rendering Engine        │
-│   • Realistic Virtual Terrain Models (City, Mountain, Village, Port)   │
-│   • Simulated UAV Kinematics (Hover, Figure-8, Incursion Vectors)      │
-│   • Simulated Sensor Uncertainty Shaders (Volumetric Fog, Rain, Night) │
-└────────────────────────────────────────────────────────────────────────┘
-```
+| Metric | Measures | Target Competency |
+|---|---|---|
+| **Detection Latency** | Time taken to identify an event | Rapid scanning and initial track lock |
+| **Classification Accuracy** | Correct object classification | Distinguishing UAVs from birds, decoys, and clutter |
+| **Decision Appropriateness** | Suitability of selected simulated response | Proportional escalation (`MONITOR`, `VERIFY`, `ALERT`) |
+| **Response Timing** | Time between recognition and response | Decisive action without hesitation |
+| **Evidence Calibration** | Alignment between confidence and available evidence | Resisting premature commitment under low confidence |
+| **Uncertainty Handling** | Performance when information quality is reduced | Operation in dense fog, rain, or night conditions |
+| **Multi-Object Tracking** | Ability to manage simultaneous objects | Prioritizing multiple aerial contacts in airspace |
+| **Cross-Scenario Consistency** | Stability of performance across scenarios | Reproducible proficiency across different seeds |
 
 ---
 
-## 🎛️ Dual Operating Modes: Trainee vs. Instructor Studio
+## 🎲 Reproducible Scenario Seeds
 
-THREATVERSE features a seamless top-bar toggle between two purpose-built operational interfaces:
+Every generated scenario is associated with a **Scenario ID** and **deterministic seed** (e.g., `TV-CITY-00482`, `Seed: #928173`), allowing instructors to reproduce the same simulation configuration for controlled comparison and training assessment.
+
+* **Shareable Seeds:** Scenario IDs and seeds can be copied and shared for reproducible training sessions.
+* **Deterministic Generation:** The seed sets the virtual terrain, atmospheric weather condition, object trajectories, decoy presence, and initial sensor uncertainty values identically every time.
+
+---
+
+## 🎛️ Dual Operational Modes: Trainee vs. Instructor Studio
+
+THREATVERSE features a seamless top-bar toggle between two operational views:
 
 ### 1. Trainee Mode
-* **Simulated Sensor Uncertainty:** Trainee operates under degraded conditions: exponential atmospheric fog, nocturnal lighting, radar noise jitter, and optical distance falloff.
-* **No Ground Truth Access:** Target classification labels are masked; the trainee must rely purely on optical tracking, radar kinematics, and acoustic telemetry.
-* **Active Decision HUD:** Integrated classification bar (`DRONE`, `NON-THREAT`, `UNKNOWN`) and escalation bar (`MONITOR`, `VERIFY`, `ALERT`).
+* **Simulated Sensor Uncertainty:** Trainees operate under authentic simulation constraints: exponential atmospheric fog, nocturnal lighting, optical distance falloff, and ambiguous silhouettes.
+* **Masked Ground Truth:** Target threat identities remain hidden to test observation discipline and prevent verification bias.
+* **Interactive Action HUD:** Real-time classification (`DRONE`, `NON-THREAT`, `UNKNOWN`) and escalation dispatch (`MONITOR`, `VERIFY`, `ALERT`).
 
 ### 2. Instructor Studio (Ground Truth Layer)
-* **Ground Truth HUD Overlay:** Instantly projects ground truth target identities, real-time 3D coordinate vectors, exact ground speeds, and true payload configurations over the 3D viewport.
-* **Live Environmental Disruption Controls:** Instructors can trigger live weather transitions, inject GPS signal degradation, induce secondary bird flock decoys, or alter UAV flight trajectories in real time.
-* **Scenario Seed Generator:** Generate, test, and distribute reproducible drill seeds to cohort classes.
+* **Ground Truth Layer Overlay:** Activates the ground truth overlay in the 3D viewport, revealing the simulated ground-truth state, including object position, movement parameters, classification identity, and configured training attributes.
+* **Real-Time Disruption Injections:** Instructors can trigger live weather transitions (dense fog, rain), toggle decoys, or alter UAV trajectories in real time.
+* **Cohort Scenario Synthesis:** Seed generator allowing instructors to specify difficulty (1.0 to 10.0 scale) and distribute identical drills across a class.
 
 ---
 
-## 📈 Multi-Object Progression Ladder
+## 🎯 5 Demonstrable Core Capabilities
 
-To systematically develop operator competence, THREATVERSE structures scenarios into a 5-tier complexity ladder:
+The working application directly demonstrates all five core functional features:
 
-* **Level 1 — Single Ambient Target (Difficulty 1-2):** Clear daylight, single commercial quadcopter hovering at 80m, zero clutter, 100% sensor confidence.
-* **Level 2 — Moving Target in Urban Clutter (Difficulty 3-4):** City high-rise corridor, quadcopter executing figure-8 recon at 35m altitude, moving building shadow occlusions.
-* **Level 3 — Multi-Object Ambiguity (Difficulty 5-6):** Target drone flying in proximity to bird flock decoys; trainee must differentiate flapping wing kinematics from spinning quadcopter rotors.
-* **Level 4 — Degraded Atmospheric Conditions (Difficulty 7-8):** Twilight or heavy precipitation with dense volumetric fog ($<120\text{ m}$ visibility); intermittent radar returns with $\pm 18\text{ m}$ position noise.
-* **Level 5 — Coordinated Multi-Axis Incursions (Difficulty 9-10):** Dual simultaneous UAV threats (fixed-wing reconnaissance high + Micro-FPV drone low-level dash) combined with sensor telemetry dropouts and urban reflections.
+1. **Scenario Generation:** 1-click generation from seeds (`#928173`), instantly configuring terrains, weathers, and object counts.
+2. **Trainee Decision Capture:** Real-time capture of classification (`DRONE`, `NON-THREAT`, `UNKNOWN`) and response (`MONITOR`, `VERIFY`, `ALERT`) with visual feedback.
+3. **Evidence/Event Logging:** Real-time logging of trainee commits into an immutable audit table with timestamps, simulated distances, and sensor confidence levels.
+4. **"What Did I Know Then?" Replay:** Interactive chronological timeline scrubber stepping through key decision points (`T+00:00`, `T+00:05`, `T+00:11`, `T+00:16`) to display the exact evidence state at each step.
+5. **Adaptive Next Scenario:** 1-click deployment of tailored adaptive drills designed around flagged trainee weaknesses (e.g., atmospheric fog +40%, scaled difficulty 7.0/10).
 
 ---
 
-## 🌍 Realistic Multi-Terrain 3D Environments
+## 🌍 Multi-Terrain 3D Virtual Environments
 
-Instantly switch between four realistic virtual terrains:
-* 🏙️ **Metropolis City Sector:** Dense commercial district with high-rise office towers, illuminated window grids, rooftop HVAC equipment, communication antennas with red hazard beacons, multi-lane highway grid, sidewalks, and streetlights.
+* 🏙️ **Metropolis City Sector:** Dense commercial district with high-rise office towers, window illumination grids, rooftop HVAC equipment, communication antennas with hazard beacons, multi-lane highway grid, sidewalks, and streetlights.
 * ⛰️ **Mountain Outpost & Valley:** Undulating mountain terrain with steep ridges, rocky peaks, elevated observation watchtower with searchlights, winding trails, and alpine pine forests.
-* 🌾 **Rural Village & Croplands:** Agricultural landscape featuring 5 distinct 3D crop fields (golden wheat fields with furrowed ridges, rolled cylindrical hay bales, lush vineyard rows with end-posts, blooming lavender plots, mustard yellow blossom patches, and dark loam furrows), irrigation canal with stone bridge, rotating traditional windmill with lattice sailcloth blades, twin steel grain silos, 3D red farm tractor, wooden utility cart, cobblestone water well, farmhouses, homesteads, red timber barns, dry-stone walls, roadside utility poles, and fruit orchards.
+* 🌾 **Rural Village & Croplands:** Agricultural landscape featuring 5 distinct 3D crop fields (golden wheat fields with furrowed ridges, rolled cylindrical hay bales, lush vineyard rows with end-posts, blooming lavender plots, mustard yellow blossom patches, and dark loam furrows), irrigation canal with stone bridge, rotating traditional windmill with lattice sailcloth blades, twin steel grain silos, 3D farm tractor, wooden utility cart, cobblestone water well, farmhouses, homesteads, red timber barns, dry-stone walls, roadside utility poles, and fruit orchards.
 * ⚓ **Coastal Industrial Port & Maritime Basin:** Deep ocean water with animated wave surface, turquoise shallow water shelf, riprap granite breakwater jetty, heavy concrete quayside dock with rubber fenders, cast-iron mooring bollards, full-scale 140m container cargo freighter ship, two 44m tall Ship-to-Shore (STS) container gantry cranes with container spreader hoists, active sweeping searchlight lighthouse, floating red & green channel navigation buoys with bobbing physics, container reach-stacker, logistics warehouses, petrochemical fuel tank farm, and high-mast terminal floodlight towers.
 
 ---
 
-## 🚁 Customizable UAV Threat Configurations
+## 🚁 Customizable UAV Threat Models
 
-Equipped with four customizable 3D UAV threat configurations:
 * **Commercial Quadcopter (DJI Mavic / Phantom style):** 4 carbon-fiber arms, spinning rotors, landing skids, 3-axis gyro gimbal optical camera, and FAA/ICAO anti-collision strobe lights.
 * **Fixed-Wing Reconnaissance UAV:** Aerodynamic surveillance glider with long wingspan, rear pusher propeller, and belly optical turret.
 * **Industrial Heavy Hexacopter:** 6 radial motor arms, dual heavy-duty battery packs, and suspended threat cargo/payload module.
 * **Micro-FPV Drone:** Ultra-compact high-speed racing quad with aggressive camera tilt and acrobatic evasion trajectories.
 
-### Real-Time Customizer Controls:
-* **Simulation Distance:** Adjust engagement range from **Close Inspection (40m)** to **Tactical (140m)** and **Perimeter (350m)**.
-* **Flight Altitude:** Adjust operating altitude from low-level rooftop skimming (12m) to high altitude (120m).
-* **Simulated Movement Models:** From stationary station-keeping hover to slow reconnaissance or high-speed evasive dash.
-* **Threat Payload Selection:** EO/IR Surveillance Gimbal, Suspended Payload / Dropper, or Passive Environmental Telemetry Sensor.
-* **Navigation Lighting:** High-Visibility Strobes, Military Green/Red, Stealth (Lights Dark), or Warning Amber.
-* **Camera Suite:** Observer Eye-Level, Target Track Lock, Overview Camera (top-down situational awareness), and Free Orbit.
+### Customizer Controls:
+* **Simulation Distance:** Adjust distance from Close Inspection (40m) to Tactical (140m) and Perimeter (350m).
+* **Flight Altitude:** Adjust operating altitude from rooftop skimming (12m) to high altitude (120m).
+* **Simulated Movement Models:** From stationary hover to slow reconnaissance or high-speed evasive dash.
+* **Threat Payload Selection:** EO/IR Surveillance Gimbal, Suspended Payload, or Passive Environmental Telemetry Sensor.
+* **Camera Suite:** Observer Eye-Level, Target Track Lock, Overview Camera (top-down perspective), and Free Orbit.
 
 ---
 
@@ -189,7 +262,7 @@ python -m http.server 3000
 # Navigate to: http://localhost:3000
 ```
 
-Alternatively, open `index.html` directly in your browser.
+Alternatively, open `index.html` directly in your web browser.
 
 ---
 
@@ -203,9 +276,10 @@ Alternatively, open `index.html` directly in your browser.
 | **Quick Zoom (+ / -)** | Step optical PTZ magnification (1.0x - 8.0x) |
 | **1-Click Drone Focus** | Instantly snap and zoom camera onto active drone |
 | **Trainee / Instructor Toggle** | Switch between Trainee View and Instructor Studio with Ground Truth Layer |
-| **Scenario Seed Badge** | Click to copy scenario seed for comparative cohort testing |
+| **Scenario Seed Badge** | Click to copy scenario seed for reproducible training sessions |
 | **Camera Selector** | Toggle Observer Eye-Level, Target Track Lock, Overview Camera, or Free Orbit |
 | **Trainee Action Bar** | Classify threat (`DRONE`, `NON-THREAT`, `UNKNOWN`) and dispatch response (`MONITOR`, `VERIFY`, `ALERT`) |
+| **AAR Timeline Slider** | Scrub chronologically through decision points to inspect evidence state |
 
 ---
 
